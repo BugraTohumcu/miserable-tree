@@ -53,7 +53,7 @@ namespace mislib
         if (*ptr == ' ') ptr++;
 
         i = 0;
-        while (*ptr != '\0' && *ptr != '\r' && *ptr != '\n') { // Satır sonuna kadar
+        while (*ptr != '\0' && *ptr != '\r' && *ptr != '\n') {
             if (i < sizeof(book.genre) - 1) {
                 book.genre[i++] = *ptr;
             }
