@@ -9,8 +9,7 @@
 
 namespace mislib
 {
-    template<typename T>
-    class IndexRepo: public CrudRepository<IndexEntry>{
+   class IndexRepo: public CrudRepository<IndexEntry>{
     
         private:
             std::fstream indexFile;
@@ -33,10 +32,10 @@ namespace mislib
                 }
             }
 
-            bool create(const T& data) override {
+            bool create(const IndexEntry& data) override {
                 try {
                     indexFile.seekp(0, std::ios::end);
-                    indexFile.write(reinterpret_cast<const char*>(&data), sizeof(T));
+                    indexFile.write(reinterpret_cast<const char*>(&data), sizeof(IndexEntry));
 
                     if (indexFile.fail()) {
                         return false;

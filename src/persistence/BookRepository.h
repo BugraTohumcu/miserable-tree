@@ -7,11 +7,11 @@
 #include "CrudRepository.h"
 #include "../entity/BookEntity.h"
 #include "../index/BookIndex.h"
+#include "../util/BookParser.h"
 
 
 namespace mislib
 {
-    template <typename T>
     class BookRepo : public CrudRepository<Book>{ 
 
         private: 
@@ -26,11 +26,11 @@ namespace mislib
                 }
             }
 
-            bool create(const T& data) override{
+            bool create(const Book& data) override{
                 return false;
             }
 
-            bool get(size_t id, T& out){
+            bool get(size_t id, Book& out){
                 size_t offset = index.getIndex(id);
                 
                 dataFile.clear();
