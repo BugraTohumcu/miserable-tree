@@ -4,10 +4,11 @@
 // Imports
 #include <fstream>
 #include <iostream>
-#include "../entity/BookEntity.h"
 #include <cstring>
 #include <sstream>
 #include <vector>
+#include <cstdlib> 
+#include "../entity/BookEntity.h"
 
 
 namespace mislib
@@ -15,10 +16,53 @@ namespace mislib
     class BookParser{
     public:
 
-        static Book parseToBook(const std::string& line) {
-            Book book;
-            return book;
+
+    static Book parseToBook(const std::string& line) {
+        Book book = {}; 
+        
+        const char* ptr = line.c_str(); 
+
+        book.id = std::atoi(ptr); 
+
+        while (*ptr != '\0' && *ptr != ',') ptr++;
+        if (*ptr == ',') ptr++; 
+        if (*ptr == ' ') ptr++; 
+
+        int i = 0;
+        while (*ptr != '\0' && *ptr != ',') {
+            if (i < sizeof(book.title) - 1) {
+                book.title[i++] = *ptr;
+            }
+            ptr++;
         }
+        book.title[i] = '\0'; 
+        
+        if (*ptr == ',') ptr++;
+        if (*ptr == ' ') ptr++;
+
+        i = 0;
+        while (*ptr != '\0' && *ptr != ',') {
+            if (i < sizeof(book.author) - 1) {
+                book.author[i++] = *ptr;
+            }
+            ptr++;
+        }
+        book.author[i] = '\0';
+
+        if (*ptr == ',') ptr++;
+        if (*ptr == ' ') ptr++;
+
+        i = 0;
+        while (*ptr != '\0' && *ptr != '\r' && *ptr != '\n') { // Satır sonuna kadar
+            if (i < sizeof(book.genre) - 1) {
+                book.genre[i++] = *ptr;
+            }
+            ptr++;
+        }
+        book.genre[i] = '\0';
+
+        return book;
+    }
         static size_t parseIdFromLine(const std::string& line){
             const char* p1 = line.c_str();
             std::string token;
