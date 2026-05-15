@@ -5,8 +5,9 @@
 #include <ostream>
 
 #pragma pack(push, 1)
-struct Book
+namespace mislib
 {
+    struct Book{
     int id;
     char title[100];
     char author[80];
@@ -23,5 +24,8 @@ struct Book
         return os;
     }
 };
+
+} // namespace mislib
+
 #pragma pack(pop)
 #endif
