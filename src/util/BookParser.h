@@ -12,6 +12,7 @@
 
 
 #define DELIMETER ','
+#define COLUMN_SIZE 4
 
 
 namespace mislib{
@@ -35,11 +36,11 @@ namespace mislib{
             dest[len] = '\0';
         }
     
-        static std::array<int, 4> findDelimeters(const char* line){
+        static std::array<int, COLUMN_SIZE> findDelimeters(const char* line){
             const char* start = line;
             const char* current = start;
             int len = std::strlen(line);
-            std::array<int, 4> delimeterTable = {0}; 
+            std::array<int, COLUMN_SIZE> delimeterTable = {0}; 
             int nc = 0;
     
             if(*current == '\0') return {-1,-1,-1,-1};
@@ -75,7 +76,7 @@ namespace mislib{
     static Book parseToBook(const char* line) {
         
         //Comma table for direct access
-        std::array<int,4> commaTable = detail::findDelimeters(line);
+        std::array<int,COLUMN_SIZE> commaTable = detail::findDelimeters(line);
         Book book{};
         if(commaTable[0] <= -1) return book;
         
