@@ -2,18 +2,39 @@
 #define BOOK_INDEX
 
 #include <cstdlib>
+#include <string>
+#include <vector>
+
+// İŞTE BURASI: Senin yazdığın dosyayı arkadaşının sistemine bağlıyoruz
+#include "../b-treeOrganization/btreeStructure.h" 
 
 namespace mislib
 {   
     class BookIndex{
+        private:
+         
+            BTree titleIndex; 
 
         public:
-        size_t getIndex(size_t id){
-            return id;
-        }
+            
+            BookIndex() : titleIndex(50) {} 
 
+            
+            size_t getIndex(size_t id){
+                return id;
+            }
+
+            // --- YENİ EKLENENLER ---
+            // Arkadaşının Parser'ı okuduğu kitapları senin ağacına buradan ekleyecek
+            void insertToTitleIndex(const std::string& title, int id) {
+                titleIndex.insert(title, id);
+            }
+
+            // Arayüz kitap arattığında senin ağacın ID'leri buradan döndürecek
+            std::vector<int> getIdsByTitle(const std::string& title) {
+                return titleIndex.search(title);
+            }
     };
 }// namespace mislib
-
 
 #endif
