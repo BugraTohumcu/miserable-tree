@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-// İŞTE BURASI: Senin yazdığın dosyayı arkadaşının sistemine bağlıyoruz
-#include "../b-treeOrganization/btreeStructure.h" 
+// İŞTE BURASI dosyayı sistemine bağlıyoruz
+#include "../bTreeMainStructure/btreeStructure.h"
 
 namespace mislib
 {   
@@ -25,7 +25,7 @@ namespace mislib
             }
 
             // --- YENİ EKLENENLER ---
-            // Arkadaşının Parser'ı okuduğu kitapları senin ağacına buradan ekleyecek
+            // Parser'ı okuduğu kitapları senin ağacına buradan ekleyecek
             void insertToTitleIndex(const std::string& title, int id) {
                 titleIndex.insert(title, id);
             }
