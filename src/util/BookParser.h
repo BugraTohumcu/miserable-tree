@@ -2,87 +2,99 @@
 #define BOOK_PARSER
 
 // Imports
-#include <fstream>
-#include <iostream>
 #include <cstring>
 #include <sstream>
-#include <vector>
 #include <cstdlib> 
+#include <array>
+#include <charconv>
+#include <memory>
 #include "../entity/BookEntity.h"
+
+
+#define DELIMETER ','
 
 
 namespace mislib
 {
     class BookParser{
-    public:
-
-
-    static Book parseToBook(const std::string& line) {
-        Book book = {}; 
+        public:
+        Book parseToBook(const char* line) {
         
-        const char* ptr = line.c_str(); 
-
-        book.id = std::atoi(ptr); 
-
-        while (*ptr != '\0' && *ptr != ',') ptr++;
-        if (*ptr == ',') ptr++; 
-        if (*ptr == ' ') ptr++; 
-
-        int i = 0;
-        while (*ptr != '\0' && *ptr != ',') {
-            if (i < sizeof(book.title) - 1) {
-                book.title[i++] = *ptr;
-            }
-            ptr++;
-        }
-        book.title[i] = '\0'; 
+            //Comma table for direct access
+            std::array<int,4> commaTable = this->findDelimeters(line);
+            Book book{};
+            if(commaTable[0] <= -1) return book;
         
-        if (*ptr == ',') ptr++;
-        if (*ptr == ' ') ptr++;
-
-        i = 0;
-        while (*ptr != '\0' && *ptr != ',') {
-            if (i < sizeof(book.author) - 1) {
-                book.author[i++] = *ptr;
-            }
-            ptr++;
+            // convert id to int  
+            std::from_chars(line, line + commaTable[0], book.id);
+        
+            copyField(book.title,  line, commaTable[0] + 1, commaTable[1], sizeof(book.title));
+            copyField(book.author, line, commaTable[1] + 1, commaTable[2], sizeof(book.author));
+            copyField(book.genre,  line, commaTable[2] + 1, commaTable[3], sizeof(book.genre));
+        
+            // Start after the 4th comma and skip any leading spaces      
+            const char* dateStart = line + commaTable[3] + 1;
+            while (*dateStart == ' ') dateStart++;
+        
+            // Convert date to int 
+            std::from_chars(dateStart, line + std::strlen(line), book.date);
+        
+            return book;
         }
-        book.author[i] = '\0';
+        
+    
+    private:
+    void copyField(char* dest, const char* src, int start, int end, size_t destSize){
 
-        if (*ptr == ',') ptr++;
-        if (*ptr == ' ') ptr++;
-
-        i = 0;
-        while (*ptr != '\0' && *ptr != '\r' && *ptr != '\n') {
-            if (i < sizeof(book.genre) - 1) {
-                book.genre[i++] = *ptr;
-            }
-            ptr++;
+        // Skip the spaces at the begining
+        while (start < end && src[start] == ' ') {
+            start++;
         }
-        book.genre[i] = '\0';
 
-        return book;
+        // Prevent buffer overflow by truncating
+        int len = end - start;
+        if(len >= destSize){
+            len = destSize - 1;
+        }
+
+        std::memcpy(dest, src + start, len);
+        dest[len] = '\0';
     }
-        static size_t parseIdFromLine(const std::string& line){
-            const char* p1 = line.c_str();
-            std::string token;
+
+    std::array<int, 4> findDelimeters(const char* line){
+        const char* start = line;
+        const char* current = start;
+        int len = std::strlen(line);
+        std::array<int, 4> delimeterTable = {0}; 
+        int nc = 0;
+
+        if(*current == '\0') return {-1,-1,-1,-1};
+        // Skip spaces 
+        while (*current && *current == ' ') current++;
+        
+        // Find the first delimeter for id 
+        while (*current && *current != ',') current++;
             
-            //Reach the first comma
-            while (*p1 != ','){
-                p1++;
-            }
-            
-
-
-            std::stringstream ss(line);
-            if(std::getline(ss,token)){
-                if (!token.empty() && token[0] == ' ')
-                    token.erase(0, 1);
-            }
-
-            return std::stoi(token);
-
+        // Safe exit if there is no comma
+        if (*current == '\0') {
+            return delimeterTable; 
         }
+
+        // ID delimeter location
+        delimeterTable[nc++] = (int) (current - start); 
+            
+        // Read from the end to isolate internal commas inside the book title
+        nc = 3;
+        current = start + len - 1;
+        while(nc != 0 && current >= start){
+            if(*current == ','){
+                delimeterTable[nc--] = (int) (current - start);
+            }
+            current--;
+        }
+            
+        return delimeterTable;
+    }
 };
 } // namespace mislib
 
