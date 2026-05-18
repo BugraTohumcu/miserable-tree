@@ -27,7 +27,7 @@ namespace mislib{
             }
     
             // Prevent buffer overflow by truncating
-            int len = end - start;
+            size_t len = end - start;
             if(len >= destSize){
                 len = destSize - 1;
             }
@@ -36,14 +36,14 @@ namespace mislib{
             dest[len] = '\0';
         }
     
-        static std::array<int, COLUMN_SIZE> findDelimeters(const char* line){
+        static std::array<size_t, COLUMN_SIZE> findDelimeters(const char* line){
             const char* start = line;
             const char* current = start;
             int len = std::strlen(line);
-            std::array<int, COLUMN_SIZE> delimeterTable = {0}; 
+            std::array<size_t, COLUMN_SIZE> delimeterTable = {0}; 
             int nc = 0;
     
-            if(*current == '\0') return {-1,-1,-1,-1};
+            if(*current == '\0') return {0,0,0,0};
             // Skip spaces 
             while (*current && *current == ' ') current++;
             
@@ -76,9 +76,9 @@ namespace mislib{
     static Book parseToBook(const char* line) {
         
         //Comma table for direct access
-        std::array<int,COLUMN_SIZE> commaTable = detail::findDelimeters(line);
+        std::array<size_t,COLUMN_SIZE> commaTable = detail::findDelimeters(line);
         Book book{};
-        if(commaTable[0] <= -1) return book;
+        if(commaTable[0] <= 0) return book;
         
         // convert id to int  
         std::from_chars(line, line + commaTable[0], book.id);
