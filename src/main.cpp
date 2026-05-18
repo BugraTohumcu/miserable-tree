@@ -16,8 +16,7 @@ using namespace mislib;
 // Global tracker for the latest record ID
 size_t lastId = 0;
 
-/**
- * System Boot Logic: Automatically populates the B+ Tree from the dataset
+/** * System Boot Logic: Automatically populates the B+ Tree from the dataset
  */
 void autoLoad(BPlusTree& tree) {
     ifstream dataset("books_dataset.txt");
@@ -57,8 +56,8 @@ int main() {
     // Trigger automatic index population on startup
     autoLoad(tree);
 
-    int secim = -1;
-    while (secim != 0) {
+    int selection = -1;
+    while (selection != 0) {
         cout << "\n--- MISLIB SYSTEM DASHBOARD (Last ID: " << lastId << ") ---" << endl;
         cout << "1. Search Book by ID" << endl;
         cout << "2. Register New Book (Auto-ID)" << endl;
@@ -67,13 +66,13 @@ int main() {
         cout << "Selection: ";
 
         // Validate user input type
-        if (!(cin >> secim)) {
+        if (!(cin >> selection)) {
             cin.clear();
             cin.ignore(1000, '\n');
             continue;
         }
 
-        if (secim == 1) { // SEARCH OPERATION
+        if (selection == 1) { // SEARCH OPERATION
             size_t id;
             cout << "Enter Search ID: "; cin >> id;
 
@@ -98,17 +97,17 @@ int main() {
             }
             else cout << "\n[ERROR] ID " << id << " not found in the index." << endl;
         }
-        else if (secim == 2) { // INSERTION OPERATION
+        else if (selection == 2) { // INSERTION OPERATION
             // Increment ID automatically based on the last known peak
             lastId++;
-            Book yeni;
-            yeni.id = lastId;
+            Book newBook;
+            newBook.id = lastId;
 
             cin.ignore(); // Flush newline from previous cin
-            cout << "Title: ";  cin.getline(yeni.title, 50);
-            cout << "Author: "; cin.getline(yeni.author, 50);
-            cout << "Genre: ";  cin.getline(yeni.genre, 30);
-            cout << "Year: ";   cin >> yeni.date;
+            cout << "Title: ";  cin.getline(newBook.title, 50);
+            cout << "Author: "; cin.getline(newBook.author, 50);
+            cout << "Genre: ";  cin.getline(newBook.genre, 30);
+            cout << "Year: ";   cin >> newBook.date;
 
             // Persistent storage: Append the new record to the CSV file
             ofstream outFile("books_dataset.txt", ios::app);
@@ -118,21 +117,21 @@ int main() {
             size_t newOffset = (size_t)outFile.tellp();
 
             // Append with standardized CSV format
-            outFile << yeni.id << "," << yeni.title << "," << yeni.author << ","
-                << yeni.genre << "," << yeni.date << "\n";
+            outFile << newBook.id << "," << newBook.title << "," << newBook.author << ","
+                << newBook.genre << "," << newBook.date << "\n";
             outFile.close();
 
             // Synchronize the B+ Tree with the newly written record
-            tree.insert(yeni.id, newOffset);
-            cout << "\n[SUCCESS] Entry saved at offset: " << newOffset << " with ID: " << yeni.id << endl;
+            tree.insert(newBook.id, newOffset);
+            cout << "\n[SUCCESS] Entry saved at offset: " << newOffset << " with ID: " << newBook.id << endl;
         }
-        else if (secim == 3) { // DELETION OPERATION
-            size_t silId;
-            cout << "Enter ID to Delete: "; cin >> silId;
+        else if (selection == 3) { // DELETION OPERATION
+            size_t deleteId;
+            cout << "Enter ID to Delete: "; cin >> deleteId;
 
             // Remove from the logical index structure
-            if (tree.remove(silId)) {
-                cout << "\n[SUCCESS] ID " << silId << " removed from B+ Tree." << endl;
+            if (tree.remove(deleteId)) {
+                cout << "\n[SUCCESS] ID " << deleteId << " removed from B+ Tree." << endl;
             }
             else {
                 cout << "\n[ERROR] Operation failed. Target ID does not exist." << endl;
