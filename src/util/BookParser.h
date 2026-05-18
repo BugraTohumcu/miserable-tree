@@ -48,7 +48,7 @@ namespace mislib{
             while (*current && *current == ' ') current++;
             
             // Find the first delimeter for id 
-            while (*current && *current != ',') current++;
+            while (*current && *current != DELIMETER) current++;
                 
             // Safe exit if there is no comma
             if (*current == '\0') {
@@ -95,6 +95,32 @@ namespace mislib{
         std::from_chars(dateStart, line + std::strlen(line), book.date);
         
         return book;
+    }
+
+    static size_t extractId(const char* line){
+        const char* idStart = line;
+        const char* current = line;
+        if(!current || *current == '\0' ) return -0;
+        
+        //Skip spaces
+        while (*current == ' ') current++;
+        
+        //Reach the first delimeter
+        while (*current != '\0' && *current != DELIMETER) current++;
+
+        //Return if there is no number
+        if (current == idStart) return 0; 
+        
+        size_t id;
+        
+        auto [ptr, ec] = std::from_chars(idStart, current, id);
+
+        if(ec != std::errc{}){
+            return 0;
+        }
+
+        return id;
+        
     }
 
 } // namespace mislib
