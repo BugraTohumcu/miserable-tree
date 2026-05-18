@@ -100,7 +100,7 @@ namespace mislib{
     static size_t extractId(const char* line){
         const char* idStart = line;
         const char* current = line;
-        if(!current || *current == '\0' ) return -0;
+        if(!current || *current == '\0' ) return 0;
         
         //Skip spaces
         while (*current == ' ') current++;
@@ -112,7 +112,7 @@ namespace mislib{
         if (current == idStart) return 0; 
         
         size_t id;
-        
+
         auto [ptr, ec] = std::from_chars(idStart, current, id);
 
         if(ec != std::errc{}){
