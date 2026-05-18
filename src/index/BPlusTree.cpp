@@ -22,8 +22,7 @@ namespace mislib
         // Drill down the internal nodes until we hit the leaf level
         while (!current->isLeaf) {
             // Binary search to find the correct subtree router
-            auto it = std::lower_bound(current->keys.begin(), current->keys.end(), id);
-            size_t index = std::distance(current->keys.begin(), it);
+            auto [index, it] = mislib::IdSearch(current->keys, id);
             current = current->children[index];
         }
 
@@ -52,8 +51,7 @@ namespace mislib
         }
 
         // Now at the leaf level, execute the final search for the actual record
-        auto it = std::lower_bound(current->keys.begin(), current->keys.end(), id);
-        size_t index = std::distance(current->keys.begin(), it);
+        auto [index, it] = mislib::IdSearch(current->keys, id);
 
 
         // Validate index boundaries and verify if the key matches our target
