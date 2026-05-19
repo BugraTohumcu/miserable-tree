@@ -88,6 +88,7 @@ namespace mislib
          * @brief Traverses the leaf-level linked list to print all records in ascending order.
          * This leverages the B+ Tree structure for O(N) sequential scanning.
          */
+        void listAllRecords(const std::string& filename);
        
     };
 } // namespace mislib
