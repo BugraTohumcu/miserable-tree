@@ -1,6 +1,10 @@
 #include "BPlusTree.h"
 #include <algorithm>
+#include "../entity/BookEntity.h"   
+#include "../util/BookParser.h"     
 #include "../util/BPlusTreeUtils.h"
+#include <fstream>
+#include <string>
 
 namespace mislib
 {
@@ -129,6 +133,35 @@ namespace mislib
             parentNode = parentNode->parent;
         }
         return true;
+    }
+    void BPlusTree::listAllRecords(const std::string& filename) {
+        if (root == nullptr) return;
+
+        // Step 1: Go straight down to the leftmost leaf node (with the smallest ID).
+        BPlusNode* current = root;
+        while (!current->isLeaf) {
+            current = current->children[0];
+        }
+
+        // Step 2: Read the physical data file
+        std::ifstream file(filename);
+        if (!file.is_open()) return;
+
+        std::cout << "\n--- ALL RECORDS ARE BEING LISTED  ---" << std::endl;
+
+        // Step 3: Linearly trace the linked list between the leaves
+        while (current != nullptr) {
+            for (size_t offset : current->offsets) {
+                file.seekg(offset);
+                std::string line;
+                if (std::getline(file, line)) {
+                    Book b = mislib::parseToBook(line.c_str());
+                    std::cout << b;
+                }
+            }
+            current = current->next; 
+        }
+        file.close();
     }
 
     void BPlusTree::createNewRoot(BPlusNode* oldLeft, size_t key, BPlusNode* newRight) {
