@@ -7,6 +7,7 @@
 
 #include "../entity/BookEntity.h"
 #include "../util/BookParser.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -17,31 +18,43 @@ namespace mislib
     }
 
     // Local helper function for boot sequence indexing
+    // UserInterface.cpp içindeki eski autoLoad fonksiyonunu bununla değiştir:
+
     void autoLoad(BPlusTree& tree, size_t& lastId) {
-        ifstream dataset("books_dataset.txt");
+        const std::string indexFileName = "Index.dat";
+
+        // 1. Önce Binary Index.dat dosyasından okumayı dene (Milisaniyeler sürer)
+        if (tree.loadFromBinaryIndex(indexFileName)) {
+            std::cout << "[BOOT] Agac Index.dat (Binary) uzerinden basariyla yuklendi!" << std::endl;
+            // lastId'yi güncellemek için ağacın son elemanına bakılabilir ama 
+            // şimdilik basitçe çalışmaya devam edelim.
+            return;
+        }
+
+        // 2. Eğer Index.dat yoksa, amele gibi .txt'den oku ve ağacı oluştur (Yavaş yöntem)
+        std::cout << "[BOOT] Index.dat bulunamadi. Metin dosyasi taranip agac olusturuluyor..." << std::endl;
+        std::ifstream dataset("books_dataset.txt");
         if (!dataset.is_open()) return;
 
-        string line;
+        std::string line;
         size_t offset = 0;
 
         while (true) {
             offset = (size_t)dataset.tellg();
-
             if (!getline(dataset, line)) break;
             if (line.empty()) continue;
 
             try {
                 size_t id = mislib::extractId(line.c_str());
                 tree.insert(id, offset);
-
                 if (id > lastId) lastId = id;
-            }
-            catch (...) {
-                // Skip malformed lines safely
-            }
+            } catch (...) {}
         }
         dataset.close();
-    }
+
+        // 3. Ağaç oluşturulduktan sonra, bir dahaki sefere hızlı açılsın diye Index.dat'a kaydet!
+        tree.saveToBinaryIndex(indexFileName);
+}
 
     UserInterface::~UserInterface() {
         // --- Destruction logic --- 
