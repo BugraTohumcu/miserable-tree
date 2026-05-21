@@ -4,6 +4,7 @@
 #include <string>
 #include <chrono>
 #include <optional>
+#include "../index/TreeSerializer.h"
 
 #include "../entity/BookEntity.h"
 #include "../util/BookParser.h"
@@ -20,23 +21,24 @@ namespace mislib
     // Local helper function for boot sequence indexing
     // UserInterface.cpp içindeki eski autoLoad fonksiyonunu bununla değiştir:
 
+    // UserInterface.cpp dosyasının üst kısımlarındaki autoLoad fonksiyonu
+
     void autoLoad(BPlusTree& tree, size_t& lastId) {
         const std::string indexFileName = "Index.dat";
 
-        // 1. Önce Binary Index.dat dosyasından okumayı dene (Milisaniyeler sürer)
-        if (tree.loadFromBinaryIndex(indexFileName)) {
-            std::cout << "[BOOT] Agac Index.dat (Binary) uzerinden basariyla yuklendi!" << std::endl;
-            // lastId'yi güncellemek için ağacın son elemanına bakılabilir ama 
-            // şimdilik basitçe çalışmaya devam edelim.
-            return;
+        // 1. Try loading the full tree structure from binary file
+        if (mislib::TreeSerializer::loadTree(tree, indexFileName)) {
+            std::cout << "[BOOT] Tree loaded successfully from Index.dat" << std::endl;
+            return; // Tree is ready, no need to read txt
         }
 
-        // 2. Eğer Index.dat yoksa, amele gibi .txt'den oku ve ağacı oluştur (Yavaş yöntem)
-        std::cout << "[BOOT] Index.dat bulunamadi. Metin dosyasi taranip agac olusturuluyor..." << std::endl;
-        std::ifstream dataset("books_dataset.txt");
+        std::cout << "[BOOT] Index.dat not found. Building tree from dataset..." << std::endl;
+        
+        // 2. Build from txt if binary doesn't exist
+        ifstream dataset("books_dataset.txt");
         if (!dataset.is_open()) return;
 
-        std::string line;
+        string line;
         size_t offset = 0;
 
         while (true) {
@@ -48,13 +50,14 @@ namespace mislib
                 size_t id = mislib::extractId(line.c_str());
                 tree.insert(id, offset);
                 if (id > lastId) lastId = id;
-            } catch (...) {}
+            }
+            catch (...) {}
         }
         dataset.close();
 
-        // 3. Ağaç oluşturulduktan sonra, bir dahaki sefere hızlı açılsın diye Index.dat'a kaydet!
-        tree.saveToBinaryIndex(indexFileName);
-}
+        // 3. Serialize the newly built tree for future fast boot
+        mislib::TreeSerializer::saveTree(tree, indexFileName);
+    }
 
     UserInterface::~UserInterface() {
         // --- Destruction logic --- 

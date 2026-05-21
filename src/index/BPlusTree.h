@@ -63,6 +63,9 @@ namespace mislib
         BPlusTree();
         ~BPlusTree();
 
+        friend class TreeSerializer;
+    
+
         /** * @param id: Item id         
          * @param offset: Offset of real record in data file         
          * @brief Inserts new node in tree         

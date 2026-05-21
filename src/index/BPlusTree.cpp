@@ -213,57 +213,6 @@ namespace mislib
         }
     }
 
-    void BPlusTree::saveToBinaryIndex(const std::string& filename) {
-        if (root == nullptr) return;
 
-        // Dosyayı BINARY (ikili) modda aç
-        std::ofstream file(filename, std::ios::binary | std::ios::trunc);
-        if (!file.is_open()) {
-            std::cerr << "Index dosyasi olusturulamadi!" << std::endl;
-            return;
-        }
 
-        // Ağacın en sol alt yaprağına (ilk veriye) in
-        BPlusNode* current = root;
-        while (!current->isLeaf) {
-            current = current->children[0];
-        }
-
-        std::cout << "[SYSTEM] Tree " << filename << " dosyasina binary olarak yaziliyor..." << std::endl;
-
-        // Yaprakları (Linked List gibi) sayfa sayfa gez ve dosyaya bas
-        while (current != nullptr) {
-            size_t numRecords = current->keys.size();
-            
-            for (size_t i = 0; i < numRecords; ++i) {
-                // Veriyi RAM'deki blok (page) yapısına çeviriyoruz
-                mislib::IndexEntry entry;
-                entry.id = current->keys[i];
-                entry.offset = current->offsets[i];
-
-                // C++'ın meşhur Binary "Page by Page" yazma fonksiyonu
-                file.write(reinterpret_cast<const char*>(&entry), sizeof(mislib::IndexEntry));
-            }
-            current = current->next; 
-        }
-        
-        file.close();
-        std::cout << "[SYSTEM] Binary indexleme basariyla tamamlandi!" << std::endl;
-    }
-
-    bool BPlusTree::loadFromBinaryIndex(const std::string& filename) {
-        // Dosyayı BINARY modda okumak için aç
-        std::ifstream file(filename, std::ios::binary);
-        if (!file.is_open()) return false;
-
-        mislib::IndexEntry entry;
-        
-        // Dosyadan sayfa sayfa (sizeof bloklar halinde) oku ve ağaca ekle
-        while (file.read(reinterpret_cast<char*>(&entry), sizeof(mislib::IndexEntry))) {
-            this->insert(entry.id, entry.offset);
-        }
-
-        file.close();
-        return true;
-    }
 } // namespace mislib
