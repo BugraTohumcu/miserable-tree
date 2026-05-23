@@ -81,7 +81,7 @@ namespace mislib
         leaf->offsets.insert(leaf->offsets.begin() + index, offset);
 
         // Overflow control: Split if the node size reaches the order
-        if (leaf->keys.size() >= order) {
+        if (leaf->keys.size() >= BPlusTree::order) {
             // Split half and get the promoted key
             size_t splitIndex = leaf->keys.size() / 2;
             size_t promotedKey = leaf->keys[splitIndex];
@@ -191,7 +191,7 @@ namespace mislib
         newSibling->parent = parentNode;
 
         // Recursive split if the parent overflows
-        if (parentNode->keys.size() >= order) {
+        if (parentNode->keys.size() >= BPlusTree::order) {
             size_t midIndex = parentNode->keys.size() / 2;
             size_t upKey = parentNode->keys[midIndex];
 
