@@ -6,7 +6,7 @@
 #include <iostream>
 #include <string>
 
-#define TREE_ORDER 3
+#define TREE_ORDER 128
 
 namespace mislib
 {
@@ -31,9 +31,10 @@ namespace mislib
     };
 
     class BPlusTree {
+    public:
+        static const int order = TREE_ORDER; 
     private:
         BPlusNode* root;
-        const int order = TREE_ORDER; 
 
         /** * @param id: Search id for the item.         
          * @brief Traverses down to the leaf level and returns the node where the given ID          
