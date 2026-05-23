@@ -1,154 +1,101 @@
 #include "UserInterface.h"
 #include <iostream>
-#include <fstream>
-#include <string>
 #include <chrono>
-#include <optional>
-#include "../index/TreeSerializer.h"
-
-#include "../entity/BookEntity.h"
-#include "../util/BookParser.h"
-#include <algorithm>
+#include <string>
+#include <limits>
 
 using namespace std;
 
 namespace mislib
 {
-    UserInterface::UserInterface() {
-        lastId = 0;
+    UserInterface::UserInterface(const std::string& dataPath)
+        : repo(dataPath) {}
+
+    void UserInterface::printMenu() const {
+        cout << "\n--- MISLIB SYSTEM DASHBOARD (Last ID: " << repo.getLastId() << ") ---\n"
+             << "1. Search Book by ID\n"
+             << "2. Register New Book (Auto-ID)\n"
+             << "3. Delete Book Record\n"
+             << "4. List All Records (Sorted)\n"
+             << "0. Shutdown System\n"
+             << "Selection: ";
     }
 
-    // Local helper function for boot sequence indexing
-    // UserInterface.cpp içindeki eski autoLoad fonksiyonunu bununla değiştir:
+    void UserInterface::handleSearch() {
+        size_t id;
+        cout << "Enter Search ID: "; cin >> id;
 
-    // UserInterface.cpp dosyasının üst kısımlarındaki autoLoad fonksiyonu
+        auto start = chrono::high_resolution_clock::now();
 
-    void autoLoad(BPlusTree& tree, size_t& lastId) {
-        const std::string indexFileName = "Index.dat";
+        Book book;
+        bool found = repo.get(id, book);
 
-        // 1. Try loading the full tree structure from binary file
-        if (mislib::TreeSerializer::loadTree(tree, indexFileName)) {
-            std::cout << "[BOOT] Tree loaded successfully from Index.dat" << std::endl;
-            return; // Tree is ready, no need to read txt
+        auto elapsed = chrono::duration_cast<chrono::microseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
+
+        if (found) {
+            cout << "\n[RESULT] Record Located Successfully:\n"
+                 << book
+                 << "Access Latency: " << elapsed << " us\n";
+        } else {
+            cout << "\n[ERROR] ID " << id << " not found in the index.\n";
         }
-
-        std::cout << "[BOOT] Index.dat not found. Building tree from dataset..." << std::endl;
-        
-        // 2. Build from txt if binary doesn't exist
-        ifstream dataset("books_dataset.txt");
-        if (!dataset.is_open()) return;
-
-        string line;
-        size_t offset = 0;
-
-        while (true) {
-            offset = (size_t)dataset.tellg();
-            if (!getline(dataset, line)) break;
-            if (line.empty()) continue;
-
-            try {
-                size_t id = mislib::extractId(line.c_str());
-                tree.insert(id, offset);
-                if (id > lastId) lastId = id;
-            }
-            catch (...) {}
-        }
-        dataset.close();
-
-        // 3. Serialize the newly built tree for future fast boot
-        mislib::TreeSerializer::saveTree(tree, indexFileName);
     }
 
-    UserInterface::~UserInterface() {
-        // --- Destruction logic --- 
+    void UserInterface::handleInsert() {
+        Book book;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        cout << "Title: ";  cin.getline(book.title,  50);
+        cout << "Author: "; cin.getline(book.author, 50);
+        cout << "Genre: ";  cin.getline(book.genre,  30);
+        cout << "Year: ";   cin >> book.date;
+
+        if (repo.create(book))
+            cout << "\n[SUCCESS] Book registered with ID: " << repo.getLastId() << "\n";
+        else
+            cout << "\n[ERROR] Registration failed.\n";
+    }
+
+    void UserInterface::handleDelete() {
+        size_t id;
+        cout << "Enter ID to Delete: "; cin >> id;
+
+        if (repo.remove(id))
+            cout << "\n[SUCCESS] ID " << id << " removed from index.\n";
+        else
+            cout << "\n[ERROR] Target ID does not exist.\n";
+    }
+
+    void UserInterface::handleListAll() {
+        auto start = chrono::high_resolution_clock::now();
+
+        repo.listAll();
+
+        auto elapsed = chrono::duration_cast<chrono::milliseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
+
+        cout << "\n[COMPLETE] Full scan latency: " << elapsed << " ms\n";
     }
 
     void UserInterface::run() {
-        // Execute indexing boot sequence
-        autoLoad(tree, lastId);
-
         int selection = -1;
         while (selection != 0) {
-            cout << "\n--- MISLIB SYSTEM DASHBOARD (Last ID: " << lastId << ") ---" << endl;
-            cout << "1. Search Book by ID" << endl;
-            cout << "2. Register New Book (Auto-ID)" << endl;
-            cout << "3. Delete Book Record" << endl;
-            cout << "4. List All Records (Sorted)" << endl;
-            cout << "0. Shutdown System" << endl;
-            cout << "Selection: ";
+            printMenu();
 
             if (!(cin >> selection)) {
                 cin.clear();
-                cin.ignore(1000, '\n');
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
                 continue;
             }
 
-            if (selection == 1) { // SEARCH OPERATION
-                size_t id;
-                cout << "Enter Search ID: "; cin >> id;
-
-                auto start = chrono::high_resolution_clock::now();
-                auto offset = tree.search(id);
-
-                if (offset.has_value()) {
-                    ifstream file("books_dataset.txt");
-                    file.seekg(*offset);
-
-                    string line;
-                    if (getline(file, line)) {
-                        Book b = mislib::parseToBook(line.c_str());
-                        auto end = chrono::high_resolution_clock::now();
-
-                        cout << "\n[RESULT] Record Located Successfully:" << endl;
-                        cout << b;
-                        cout << "Access Latency: " << chrono::duration_cast<chrono::microseconds>(end - start).count() << " us" << endl;
-                    }
-                    file.close();
-                }
-                else cout << "\n[ERROR] ID " << id << " not found in the index." << endl;
-            }
-            else if (selection == 2) { // INSERTION OPERATION
-                lastId++;
-                Book newBook;
-                newBook.id = lastId;
-
-                cin.ignore();
-                cout << "Title: ";  cin.getline(newBook.title, 50);
-                cout << "Author: "; cin.getline(newBook.author, 50);
-                cout << "Genre: ";  cin.getline(newBook.genre, 30);
-                cout << "Year: ";   cin >> newBook.date;
-
-                ofstream outFile("books_dataset.txt", ios::app);
-
-                outFile.seekp(0, ios::end);
-                size_t newOffset = (size_t)outFile.tellp();
-
-                outFile << newBook.id << "," << newBook.title << "," << newBook.author << ","
-                    << newBook.genre << "," << newBook.date << "\n";
-                outFile.close();
-
-                tree.insert(newBook.id, newOffset);
-                cout << "\n[SUCCESS] Entry saved at offset: " << newOffset << " with ID: " << newBook.id << endl;
-            }
-            else if (selection == 3) { // DELETION OPERATION
-                size_t deleteId;
-                cout << "Enter ID to Delete: "; cin >> deleteId;
-
-                if (tree.remove(deleteId)) {
-                    cout << "\n[SUCCESS] ID " << deleteId << " removed from B+ Tree." << endl;
-                }
-                else {
-                    cout << "\n[ERROR] Operation failed. Target ID does not exist." << endl;
-                }
-            }
-            else if (selection == 4) { // SCAN OPERATION
-                auto start = chrono::high_resolution_clock::now();
-
-                tree.listAllRecords("books_dataset.txt");
-
-                auto end = chrono::high_resolution_clock::now();
-                cout << "\n[COMPLETE] Full scan latency: "
-                    << chrono::duration_cast<chrono::milliseconds>(end - start).count() << " ms" << endl;
+            switch (selection) {
+                case 1: handleSearch();  break;
+                case 2: handleInsert();  break;
+                case 3: handleDelete();  break;
+                case 4: handleListAll(); break;
+                case 0: cout << "\n[BOOT] System shutting down.\n"; break;
+                default: cout << "\n[WARN] Invalid selection.\n"; break;
             }
         }
     }

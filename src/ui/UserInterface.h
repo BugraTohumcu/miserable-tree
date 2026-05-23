@@ -1,23 +1,35 @@
-#ifndef USER_INTERFACE_H
-#define USER_INTERFACE_H
+#ifndef USER_INTERFACE
+#define USER_INTERFACE
 
+#include "../persistence/BookRepository.h"
 #include <string>
-#include "../index/BPlusTree.h"
 
 namespace mislib
 {
-    class UserInterface {
-    private:
-        BPlusTree tree;
-        size_t lastId;
-
+    class UserInterface
+    {
     public:
-        UserInterface();
-        ~UserInterface();
+        /**
+         * @brief Initializes the interface and boots the repository layer.
+         * @param dataPath Absolute or relative path to the raw data file.
+         */
+        explicit UserInterface(const std::string& dataPath);
 
-        // Starts the application by triggering autoLoad and executing the UI loop
+        /**
+         * @brief Runs the main menu loop until the user requests shutdown.
+         */
         void run();
+
+    private:
+        mislib::BookRepo repo;
+
+        void handleSearch();
+        void handleInsert();
+        void handleDelete();
+        void handleListAll();
+        void printMenu() const;
     };
+
 } // namespace mislib
 
-#endif // USER_INTERFACE_H
+#endif
