@@ -4,6 +4,8 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <unordered_map> // YENI EKLENDI: Secondary Index icin
+#include <vector>        // YENI EKLENDI: Birden fazla ID tutabilmek icin
 #include "CrudRepository.h"
 #include "../entity/BookEntity.h"
 #include "../index/IndexManager.h"
@@ -61,9 +63,29 @@ namespace mislib
         /**
          * @brief Traverses all index entries in sorted order and prints each record.
          * @details Follows the B+ Tree leaf linked list to guarantee ID-sorted output
-         *          without loading the entire dataset into memory.
+         * without loading the entire dataset into memory.
          */
         void listAll();
+
+        // --- Secondary Index Operations ---
+
+        /**
+         * @brief Retrieves a collection of books written by a specific author.
+         * @details Utilizes the in-memory secondary index for O(1) ID retrieval, 
+         * followed by B+ Tree lookups for the actual record extraction.
+         * @param author The exact name of the author to search for.
+         * @return A vector containing all books matching the given author name.
+         */
+        std::vector<Book> getByAuthor(const std::string& author);
+
+        /**
+         * @brief Retrieves a collection of books belonging to a specific genre.
+         * @details Utilizes the in-memory secondary index for O(1) ID retrieval, 
+         * followed by B+ Tree lookups for the actual record extraction.
+         * @param genre The exact genre category to search for.
+         * @return A vector containing all books matching the given genre.
+         */
+        std::vector<Book> getByGenre(const std::string& genre);
 
         size_t getLastId() const { return lastId; }
 
@@ -73,6 +95,10 @@ namespace mislib
         std::string   dataPath;
         IndexManager  indexManager;
         size_t        lastId = 0;
+
+        // In-memory secondary indices mapping string attributes to vectors of primary IDs.
+        std::unordered_map<std::string, std::vector<size_t>> authorIndex;
+        std::unordered_map<std::string, std::vector<size_t>> genreIndex;
 
         // Marks a line as soft-deleted in the data file by prefixing it with '!'.
         static constexpr char DELETED_MARKER = '!';

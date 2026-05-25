@@ -25,15 +25,20 @@ namespace mislib
             throw std::runtime_error("[REPO] Cannot open data file: " + dataPath);
 
         // Inject book-specific parsing logic into the index build process.
-        // IndexManager has no knowledge of Book — it only sees raw lines and offsets.
-        // Soft-deleted records (prefixed with '!') are excluded from the index.
+        // Now it parses the full book to populate secondary in-memory indices.
         indexManager.loadOrBuild(dataPath, [this](const std::string& line, size_t offset) {
             if (line.empty() || line.front() == DELETED_MARKER) return;
 
-            size_t id = mislib::extractId(line.c_str());
-            indexManager.getTree().insert(id, offset);
-            if (id > lastId) lastId = id;
-            });
+            Book book = mislib::parseToBook(line.c_str());
+            
+            indexManager.getTree().insert(book.id, offset);
+            
+            // Populate secondary in-memory indices
+            authorIndex[book.author].push_back(book.id);
+            genreIndex[book.genre].push_back(book.id);
+
+            if (book.id > lastId) lastId = book.id;
+        });
 
         // If the index was loaded from a serialized file, lastId remains 0.
         // We traverse to the rightmost leaf of the B+ Tree to recover the maximum active ID.
@@ -81,6 +86,10 @@ namespace mislib
 
         // CRITICAL FIX: Commit index structural state to Index.dat immediately
         indexManager.save();
+
+        // Update secondary indices in memory
+        authorIndex[book.author].push_back(book.id);
+        genreIndex[book.genre].push_back(book.id);
 
         return result;
     }
@@ -165,6 +174,39 @@ namespace mislib
 
     void BookRepo::listAll() {
         indexManager.getTree().listAllRecords(dataPath);
+    }
+
+    // --- SECONDARY INDEX OPERATIONS ---
+
+    std::vector<Book> BookRepo::getByAuthor(const std::string& author) {
+        std::vector<Book> results;
+        auto it = authorIndex.find(author);
+        
+        if (it != authorIndex.end()) {
+            for (size_t id : it->second) {
+                Book b;
+                // get() ignores soft-deleted records implicitly
+                if (get(id, b)) {
+                    results.push_back(b);
+                }
+            }
+        }
+        return results;
+    }
+
+    std::vector<Book> BookRepo::getByGenre(const std::string& genre) {
+        std::vector<Book> results;
+        auto it = genreIndex.find(genre);
+        
+        if (it != genreIndex.end()) {
+            for (size_t id : it->second) {
+                Book b;
+                if (get(id, b)) {
+                    results.push_back(b);
+                }
+            }
+        }
+        return results;
     }
 
 } // namespace mislib

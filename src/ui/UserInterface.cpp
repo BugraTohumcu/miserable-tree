@@ -17,6 +17,8 @@ namespace mislib
              << "2. Register New Book (Auto-ID)\n"
              << "3. Delete Book Record\n"
              << "4. List All Records (Sorted)\n"
+             << "5. Search Books by Author\n"
+             << "6. Search Books by Genre\n"
              << "0. Shutdown System\n"
              << "Selection: ";
     }
@@ -78,6 +80,50 @@ namespace mislib
         cout << "\n[COMPLETE] Full scan latency: " << elapsed << " ms\n";
     }
 
+    void UserInterface::handleSearchByAuthor() {
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        char author[80];
+        cout << "Enter Author Name (Exact match): ";
+        cin.getline(author, 80);
+
+        auto start = chrono::high_resolution_clock::now();
+        std::vector<Book> results = repo.getByAuthor(author);
+        auto elapsed = chrono::duration_cast<chrono::microseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
+
+        if (!results.empty()) {
+            cout << "\n[RESULT] Found " << results.size() << " books by '" << author << "':\n";
+            for (const auto& b : results) {
+                cout << "- ID: " << b.id << " | Title: " << b.title << " | Genre: " << b.genre << " | Year: " << b.date << "\n";
+            }
+            cout << "\nAccess Latency: " << elapsed << " us\n";
+        } else {
+            cout << "\n[ERROR] No books found for author: " << author << "\n";
+        }
+    }
+
+    void UserInterface::handleSearchByGenre() {
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        char genre[40];
+        cout << "Enter Genre Name (Exact match): ";
+        cin.getline(genre, 40);
+
+        auto start = chrono::high_resolution_clock::now();
+        std::vector<Book> results = repo.getByGenre(genre);
+        auto elapsed = chrono::duration_cast<chrono::microseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
+
+        if (!results.empty()) {
+            cout << "\n[RESULT] Found " << results.size() << " books in genre '" << genre << "':\n";
+            for (const auto& b : results) {
+                cout << "- ID: " << b.id << " | Title: " << b.title << " | Author: " << b.author << " | Year: " << b.date << "\n";
+            }
+            cout << "\nAccess Latency: " << elapsed << " us\n";
+        } else {
+            cout << "\n[ERROR] No books found in genre: " << genre << "\n";
+        }
+    }
+    
     void UserInterface::run() {
         int selection = -1;
         while (selection != 0) {
@@ -94,6 +140,8 @@ namespace mislib
                 case 2: handleInsert();  break;
                 case 3: handleDelete();  break;
                 case 4: handleListAll(); break;
+                case 5: handleSearchByAuthor(); break;
+                case 6: handleSearchByGenre(); break;
                 case 0: cout << "\n[BOOT] System shutting down.\n"; break;
                 default: cout << "\n[WARN] Invalid selection.\n"; break;
             }
