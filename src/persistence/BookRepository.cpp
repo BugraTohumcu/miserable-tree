@@ -8,10 +8,18 @@ namespace mislib
 {
     BookRepo::BookRepo(const std::string& dataPath)
         : dataPath(dataPath),
-          indexManager("Index.dat")
+        indexManager("Index.dat"),
+        lastId(0)
     {
         readFile.open(dataPath, std::ios::in);
-        writeFile.open(dataPath, std::ios::out | std::ios::app);
+        writeFile.open(dataPath, std::ios::out | std::ios::binary | std::ios::ate | std::ios::in);
+
+        if (!writeFile.is_open()) {
+            std::ofstream createMe(dataPath);
+            createMe.close();
+            readFile.open(dataPath, std::ios::in);
+            writeFile.open(dataPath, std::ios::out | std::ios::binary | std::ios::ate | std::ios::in);
+        }
 
         if (!readFile.is_open() || !writeFile.is_open())
             throw std::runtime_error("[REPO] Cannot open data file: " + dataPath);
@@ -20,18 +28,36 @@ namespace mislib
         // IndexManager has no knowledge of Book — it only sees raw lines and offsets.
         // Soft-deleted records (prefixed with '!') are excluded from the index.
         indexManager.loadOrBuild(dataPath, [this](const std::string& line, size_t offset) {
-            if (line.front() == DELETED_MARKER) return;
+            if (line.empty() || line.front() == DELETED_MARKER) return;
 
             size_t id = mislib::extractId(line.c_str());
             indexManager.getTree().insert(id, offset);
             if (id > lastId) lastId = id;
-        });
+            });
+
+        // If the index was loaded from a serialized file, lastId remains 0.
+        // We traverse to the rightmost leaf of the B+ Tree to recover the maximum active ID.
+        if (lastId == 0) {
+            mislib::BPlusTree& tree = indexManager.getTree();
+
+            if (tree.getRoot() != nullptr) {
+                BPlusNode* current = tree.getRoot();
+
+                while (current != nullptr && !current->isLeaf && !current->children.empty()) {
+                    current = current->children.back();
+                }
+
+                if (current != nullptr && current->isLeaf && !current->keys.empty()) {
+                    lastId = current->keys.back();
+                }
+            }
+        }
     }
 
     BookRepo::~BookRepo() {
         indexManager.save();
-        readFile.close();
-        writeFile.close();
+        if (readFile.is_open()) readFile.close();
+        if (writeFile.is_open()) writeFile.close();
     }
 
     bool BookRepo::create(const Book& data) {
@@ -40,14 +66,14 @@ namespace mislib
 
         // Always resolve the true end-of-file position before writing
         // to avoid stale offset caused by ios::app or buffering side effects.
-        writeFile.flush();
-        size_t offset = (size_t)writeFile.tellp();
+        writeFile.seekp(0, std::ios::end);
+        size_t offset = static_cast<size_t>(writeFile.tellp());
 
-        writeFile << book.id    << ","
-                  << book.title  << ","
-                  << book.author << ","
-                  << book.genre  << ","
-                  << book.date   << "\n";
+        writeFile << book.id << ","
+            << book.title << ","
+            << book.author << ","
+            << book.genre << ","
+            << book.date << "\n";
         writeFile.flush();
 
         return indexManager.getTree().insert(book.id, offset);
@@ -58,7 +84,7 @@ namespace mislib
         if (!offsetOpt.has_value()) return false;
 
         readFile.clear();
-        readFile.seekg((std::streamoff)*offsetOpt);
+        readFile.seekg(static_cast<std::streamoff>(*offsetOpt));
 
         std::string line;
         if (!std::getline(readFile, line)) return false;
@@ -75,7 +101,7 @@ namespace mislib
         if (!offsetOpt.has_value()) return false;
 
         readFile.clear();
-        readFile.seekg((std::streamoff)*offsetOpt);
+        readFile.seekg(static_cast<std::streamoff>(*offsetOpt));
 
         std::string existingLine;
         if (!std::getline(readFile, existingLine)) return false;
@@ -85,19 +111,19 @@ namespace mislib
         // In-place overwrite is unsafe since new content may differ in byte length.
         std::fstream patchFile(dataPath, std::ios::in | std::ios::out | std::ios::binary);
         if (!patchFile.is_open()) return false;
-        patchFile.seekp((std::streamoff)*offsetOpt);
+        patchFile.seekp(static_cast<std::streamoff>(*offsetOpt));
         patchFile.put(DELETED_MARKER);
         patchFile.flush();
         patchFile.close();
 
-        writeFile.flush();
-        size_t newOffset = (size_t)writeFile.tellp();
+        writeFile.seekp(0, std::ios::end);
+        size_t newOffset = static_cast<size_t>(writeFile.tellp());
 
-        writeFile << data.id    << ","
-                  << data.title  << ","
-                  << data.author << ","
-                  << data.genre  << ","
-                  << data.date   << "\n";
+        writeFile << data.id << ","
+            << data.title << ","
+            << data.author << ","
+            << data.genre << ","
+            << data.date << "\n";
         writeFile.flush();
 
         // Re-register the updated offset in the index.
@@ -109,32 +135,17 @@ namespace mislib
         auto offsetOpt = indexManager.getTree().search(id);
         if (!offsetOpt.has_value()) return false;
 
-        // Read the original line first
-        readFile.clear();
-        readFile.seekg((std::streamoff)*offsetOpt);
-        std::string line;
-        if (!std::getline(readFile, line)) return false;
-        if (line.front() == DELETED_MARKER) return false;
-
-        // Append the soft-deleted version at the end of the file.
-        // In-place overwrite is unsafe — prepending '!' shifts all bytes by one.
-        writeFile.flush();
-        size_t newOffset = (size_t)writeFile.tellp();
-
-        writeFile << DELETED_MARKER << line << "\n";
-        writeFile.flush();
-
         // Patch the original location to prevent it from being re-indexed on next boot.
+        // In-place marker insertion is optimized to prevent file space inflation.
         std::fstream patchFile(dataPath, std::ios::in | std::ios::out | std::ios::binary);
         if (!patchFile.is_open()) return false;
-        patchFile.seekp((std::streamoff)*offsetOpt);
+        patchFile.seekp(static_cast<std::streamoff>(*offsetOpt));
         patchFile.put(DELETED_MARKER);
         patchFile.flush();
         patchFile.close();
 
         return indexManager.getTree().remove(id);
     }
-
 
     void BookRepo::listAll() {
         indexManager.getTree().listAllRecords(dataPath);
