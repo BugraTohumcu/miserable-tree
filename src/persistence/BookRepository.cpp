@@ -40,9 +40,10 @@ namespace mislib
         if (lastId == 0) {
             mislib::BPlusTree& tree = indexManager.getTree();
 
-            if (tree.getRoot() != nullptr) {
+            if (tree.getRoot() != nullptr) { // tree.root yerine tree.getRoot() yapıldı
                 BPlusNode* current = tree.getRoot();
 
+                // Drill down to the rightmost leaf node to recover index state
                 while (current != nullptr && !current->isLeaf && !current->children.empty()) {
                     current = current->children.back();
                 }
@@ -76,7 +77,12 @@ namespace mislib
             << book.date << "\n";
         writeFile.flush();
 
-        return indexManager.getTree().insert(book.id, offset);
+        bool result = indexManager.getTree().insert(book.id, offset);
+
+        // CRITICAL FIX: Commit index structural state to Index.dat immediately
+        indexManager.save();
+
+        return result;
     }
 
     bool BookRepo::get(size_t id, Book& out) {
@@ -128,7 +134,12 @@ namespace mislib
 
         // Re-register the updated offset in the index.
         indexManager.getTree().remove(data.id);
-        return indexManager.getTree().insert(data.id, newOffset);
+        bool result = indexManager.getTree().insert(data.id, newOffset);
+
+        // CRITICAL FIX: Save structural index changes immediately
+        indexManager.save();
+
+        return result;
     }
 
     bool BookRepo::remove(size_t id) {
@@ -144,7 +155,12 @@ namespace mislib
         patchFile.flush();
         patchFile.close();
 
-        return indexManager.getTree().remove(id);
+        bool result = indexManager.getTree().remove(id);
+
+        // CRITICAL FIX: Synchronize changes to transactional disk index
+        indexManager.save();
+
+        return result;
     }
 
     void BookRepo::listAll() {
