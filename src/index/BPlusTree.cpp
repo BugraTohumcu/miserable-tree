@@ -5,7 +5,6 @@
 #include "../util/BPlusTreeUtils.h"
 #include <fstream>
 #include <string>
-#include "../index/IndexEntry.h"
 
 namespace mislib
 {
