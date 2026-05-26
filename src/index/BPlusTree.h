@@ -97,6 +97,13 @@ namespace mislib
          */
         void listAllRecords(const std::string& filename);
 
+
+        /**
+         * @param node current node 
+         * @brief Deletes nodes by recursively traversing from current node to the leaf nodes
+         */
+        void clear(BPlusNode* node);
+
     };
 } // namespace mislib
 
