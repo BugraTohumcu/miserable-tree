@@ -148,8 +148,6 @@ namespace mislib
         std::ifstream file(filename);
         if (!file.is_open()) return;
 
-        std::cout << "\n--- ALL RECORDS ARE BEING LISTED  ---" << std::endl;
-
         // Step 3: Linearly trace the linked list between the leaves
         while (current != nullptr) {
             for (size_t offset : current->offsets) {
