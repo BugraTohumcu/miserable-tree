@@ -50,7 +50,7 @@ namespace mislib
          * * This method inserts the `promotedKey` into the `parentNode` and links the `newSibling`
          * right next to the original `childNode`. If the parent node also overflows after insertion,
          * this method will trigger a recursive split up towards the root.
-         * * @param parentNode Pointer to the parent node. Can be `nullptr` if the child is the current root,
+         * @param parentNode Pointer to the parent node. Can be `nullptr` if the child is the current root,
          * which triggers the creation of a new root node.
          * @param childNode  Pointer to the original left child node that just caused the split.
          * @param promotedKey The key that is being pushed up to the parent index level.
@@ -84,7 +84,42 @@ namespace mislib
          */
         bool remove(size_t id);
 
-        /** * @param id: Search id for the item.
+        /**
+         * @brief Handles underflow conditions when a node falls below the minimum key threshold.
+         * @param node The pointer to the node experiencing underflow.
+         */
+        void handleUnderflow(BPlusNode* node);
+
+        /**
+         * @brief Borrows the largest key from the left sibling and updates the parent router.
+         * @param node The current node that needs an extra key.
+         * @param leftSibling The left neighbor node sharing the same parent.
+         * @param parent The parent node of both siblings.
+         * @param parentIdx The index of the router key in the parent that separates these nodes.
+         */
+        void borrowFromLeft(BPlusNode* node, BPlusNode* leftSibling, BPlusNode* parent, size_t parentIdx);
+
+        /**
+         * @brief Borrows the smallest key from the right sibling and updates the parent router.
+         * @param node The current node that needs an extra key.
+         * @param rightSibling The right neighbor node sharing the same parent.
+         * @param parent The parent node of both siblings.
+         * @param parentIdx The index of the router key in the parent that separates these nodes.
+         */
+        void borrowFromRight(BPlusNode* node, BPlusNode* rightSibling, BPlusNode* parent, size_t parentIdx);
+
+        /**
+         * @brief Merges the right node into the left node and removes the separator key from the parent.
+         * @param leftNode The destination node that will absorb the elements.
+         * @param rightNode The redundant node that will be emptied and deallocated.
+         * @param parent The parent node of both siblings.
+         * @param parentIdx The index of the separator key in the parent.
+         */
+        void mergeNodes(BPlusNode* leftNode, BPlusNode* rightNode, BPlusNode* parent, size_t parentIdx);
+
+
+        /** 
+         * @param id: Search id for the item.
          * @brief Searches for a record offset by its ID in the B+ Tree.
          * @return Returns std::nullopt if the tree is empty or the ID doesn't exist.
          */
@@ -100,10 +135,10 @@ namespace mislib
 
         /**
          * @param node current node 
-         * @brief Deletes nodes by recursively traversing from current node to the leaf nodes
+         * @brief Deletes nodes by recursively traversing from current node to the leaf node
          */
         void clear(BPlusNode* node);
-
+        
     };
 } // namespace mislib
 

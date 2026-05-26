@@ -108,33 +108,124 @@ namespace mislib
     }
 
     bool BPlusTree::remove(size_t id) {
-        // Locate the leaf containing the target ID
-        BPlusNode* leaf = searchPosition(id);
-        if (!leaf) return false;
+    // Locate the leaf containing the target ID
+    BPlusNode* leaf = searchPosition(id);
+    if (!leaf) return false;
 
-        auto [index, it] = mislib::IdSearch(leaf->keys, id);
+    auto [index, it] = mislib::IdSearch(leaf->keys, id);
 
-        // Verify if the key exists in the leaf
-        if (index >= leaf->keys.size() || leaf->keys[index] != id) {
-            return false;
-        }
-
-        // Erase from leaf vectors
-        leaf->keys.erase(it);
-        leaf->offsets.erase(leaf->offsets.begin() + index);
-
-        // Update hierarchy: if the deleted key is used as a router in internal nodes
-        BPlusNode* parentNode = leaf->parent;
-        while (parentNode != nullptr) {
-            for (size_t i = 0; i < parentNode->keys.size(); ++i) {
-                if (parentNode->keys[i] == id) {
-                    parentNode->keys[i] = leaf->keys.empty() ? 0 : leaf->keys[0];
-                }
-            }
-            parentNode = parentNode->parent;
-        }
-        return true;
+    // Verify if the key exists in the leaf
+    if (index >= leaf->keys.size() || leaf->keys[index] != id) {
+        return false;
     }
+
+    // Erase from leaf vectors
+    leaf->keys.erase(it);
+    leaf->offsets.erase(leaf->offsets.begin() + index);
+
+    // Check if there is underflow
+    size_t minKeys = BPlusTree::order / 2;
+    if (leaf != root && leaf->keys.size() < minKeys) {
+        handleUnderflow(leaf);
+    }
+
+    // Shrink tree height if root becomes empty after cascade merges
+    if (root->keys.empty() && !root->isLeaf) {
+        BPlusNode* oldRoot = root;
+        root = root->children[0];
+        root->parent = nullptr;
+        delete oldRoot;
+    }
+
+    return true;
+}
+
+void BPlusTree::handleUnderflow(BPlusNode* node) {
+    BPlusNode* parent = node->parent;
+    if (!parent) return;
+
+    // Find the index of the current node inside parent's children vector
+    auto it = std::find(parent->children.begin(), parent->children.end(), node);
+    size_t idx = std::distance(parent->children.begin(), it);
+
+    // Define öz siblings without exceeding boundaries
+    BPlusNode* leftSibling = (idx > 0) ? parent->children[idx - 1] : nullptr;
+    BPlusNode* rightSibling = (idx < parent->children.size() - 1) ? parent->children[idx + 1] : nullptr;
+
+    size_t minKeys = BPlusTree::order / 2;
+
+    // Strategy 1: Check left sibling first, borrow if it has enough keys
+    if (leftSibling && leftSibling->keys.size() > minKeys) {
+        borrowFromLeft(node, leftSibling, parent, idx - 1);
+        return;
+    }
+
+    // Strategy 2: Check right sibling, borrow if it has enough keys
+    if (rightSibling && rightSibling->keys.size() > minKeys) {
+        borrowFromRight(node, rightSibling, parent, idx);
+        return;
+    }
+
+    // Strategy 3: Merge if borrowing is not possible from both siblings
+    if (leftSibling) {
+        mergeNodes(leftSibling, node, parent, idx - 1);
+    } else if (rightSibling) {
+        mergeNodes(node, rightSibling, parent, idx);
+    }
+
+    // Cascade underflow check up to the parent node
+    if (parent != root && parent->keys.size() < minKeys) {
+        handleUnderflow(parent);
+    }
+}
+
+void BPlusTree::borrowFromLeft(BPlusNode* node, BPlusNode* leftSibling, BPlusNode* parent, size_t parentIdx) {
+    if (node->isLeaf) {
+        // Move the largest key from left sibling to the beginning of current node
+        node->keys.insert(node->keys.begin(), leftSibling->keys.back());
+        node->offsets.insert(node->offsets.begin(), leftSibling->offsets.back());
+
+        // Remove the transferred item from left sibling
+        leftSibling->keys.pop_back();
+        leftSibling->offsets.pop_back();
+
+        // Update the router key in parent to reflect the new minimum key of current node
+        parent->keys[parentIdx] = node->keys[0];
+    }
+}
+
+void BPlusTree::borrowFromRight(BPlusNode* node, BPlusNode* rightSibling, BPlusNode* parent, size_t parentIdx) {
+    if (node->isLeaf) {
+        // Move the smallest key from right sibling to the end of current node
+        node->keys.push_back(rightSibling->keys.front());
+        node->offsets.push_back(rightSibling->offsets.front());
+
+        // Remove the transferred item from right sibling
+        rightSibling->keys.erase(rightSibling->keys.begin());
+        rightSibling->offsets.erase(rightSibling->offsets.begin());
+
+        // Update the router key in parent to reflect the new minimum key of right sibling
+        parent->keys[parentIdx] = rightSibling->keys[0];
+    }
+}
+
+void BPlusTree::mergeNodes(BPlusNode* leftNode, BPlusNode* rightNode, BPlusNode* parent, size_t parentIdx) {
+    if (leftNode->isLeaf) {
+        // Append all elements from right node to the left node
+        leftNode->keys.insert(leftNode->keys.end(), rightNode->keys.begin(), rightNode->keys.end());
+        leftNode->offsets.insert(leftNode->offsets.end(), rightNode->offsets.begin(), rightNode->offsets.end());
+
+        // Update singly linked list next pointer
+        leftNode->next = rightNode->next;
+
+        // Erase the separator key and right child pointer from parent
+        parent->keys.erase(parent->keys.begin() + parentIdx);
+        parent->children.erase(parent->children.begin() + parentIdx + 1);
+
+        // Deallocate memory for the redundant right node
+        delete rightNode;
+    }
+}
     void BPlusTree::listAllRecords(const std::string& filename) {
         if (root == nullptr) return;
 
