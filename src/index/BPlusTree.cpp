@@ -211,21 +211,65 @@ namespace mislib
         }
     }
     
+    void BPlusTree::borrowFromRight(BPlusNode* node, BPlusNode* rightSibling, BPlusNode* parent, size_t parentIdx) {
+        if (node->isLeaf) {
+            // Move the smallest key from right sibling to the end of current node
+            node->keys.push_back(rightSibling->keys.front());
+            node->offsets.push_back(rightSibling->offsets.front());
+
+            // Remove the transferred item from right sibling
+            rightSibling->keys.erase(rightSibling->keys.begin());
+            rightSibling->offsets.erase(rightSibling->offsets.begin());
+
+            // Update the router key in parent to reflect the new minimum key of right sibling
+            parent->keys[parentIdx] = rightSibling->keys[0];
+        } 
+        else {
+            // INTERNAL NODE BORROW (Counter-Clockwise Rotation Mechanism)
+            
+            // 1. Demote the parent's separator key down to the end of current node's keys
+            node->keys.push_back(parent->keys[parentIdx]);
+
+            // 2. Promote the right sibling's smallest key up to the parent's separator position
+            parent->keys[parentIdx] = rightSibling->keys.front();
+            rightSibling->keys.erase(rightSibling->keys.begin());
+
+            // 3. Transfer the right sibling's first child to the current node's last child position
+            node->children.push_back(rightSibling->children.front());
+            rightSibling->children.erase(rightSibling->children.begin());
+
+            // 4. Update the parent pointer of the transferred child node
+            node->children.back()->parent = node;
+        }
+    }
 
     void BPlusTree::mergeNodes(BPlusNode* leftNode, BPlusNode* rightNode, BPlusNode* parent, size_t parentIdx) {
         if (leftNode->isLeaf) {
-            // Append all elements from right node to the left node
+            // your existing leaf merge code stays exactly the same
             leftNode->keys.insert(leftNode->keys.end(), rightNode->keys.begin(), rightNode->keys.end());
             leftNode->offsets.insert(leftNode->offsets.end(), rightNode->offsets.begin(), rightNode->offsets.end());
-
-            // Update singly linked list next pointer
             leftNode->next = rightNode->next;
 
-            // Erase the separator key and right child pointer from parent
             parent->keys.erase(parent->keys.begin() + parentIdx);
             parent->children.erase(parent->children.begin() + parentIdx + 1);
+            delete rightNode;
 
-            // Deallocate memory for the redundant right node
+        } else {
+            // Pull the separator key down from parent into left node
+            leftNode->keys.push_back(parent->keys[parentIdx]);
+
+            // Move all keys and children from right node into left node
+            leftNode->keys.insert(leftNode->keys.end(), rightNode->keys.begin(), rightNode->keys.end());
+            leftNode->children.insert(leftNode->children.end(), rightNode->children.begin(), rightNode->children.end());
+
+            // Re-map children to their new parent
+            for (auto* child : rightNode->children) {
+                if (child) child->parent = leftNode;
+            }
+
+            // Remove separator key and right child pointer from parent
+            parent->keys.erase(parent->keys.begin() + parentIdx);
+            parent->children.erase(parent->children.begin() + parentIdx + 1);
             delete rightNode;
         }
     }
