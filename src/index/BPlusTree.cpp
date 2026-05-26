@@ -13,7 +13,8 @@ namespace mislib
     }
 
     BPlusTree::~BPlusTree() {
-        // --- Destruction logic will be implemented --- 
+        clear(root);
+        root = nullptr;
     }
 
     BPlusNode* BPlusTree::searchPosition(size_t id) {
@@ -212,6 +213,18 @@ namespace mislib
         }
     }
 
+    void BPlusTree::clear(BPlusNode* node){
+        if(node == nullptr) return;
 
+        // If it is not a leaf node traverse recurively and delete leaf node first
+        if(!node->isLeaf){
+            for(const auto& child: node->children){
+                clear(child);
+            }
+        }
+
+        //Delete node if it is a leaf node        
+        delete node;
+    }
 
 } // namespace mislib
