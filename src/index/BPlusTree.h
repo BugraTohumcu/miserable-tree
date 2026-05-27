@@ -41,17 +41,13 @@ namespace mislib
 
         /** * @param id: Search id for the item.
          * @brief Traverses down to the leaf level and returns the node where the given ID
-         * should reside (or be inserted). Useful for split/insert operations.
-         * * @return Proper position for new node to be add
+         * should reside (or be inserted). HER ZAMAN SOLA SAPAR (Multi-Map Uyumu).
+         * @return Proper position for new node to be add
          */
         BPlusNode* searchPosition(size_t id);
 
         /** * @brief Promotes a split-key up into the parent node and handles recursive tree splitting.
-         * * This method inserts the `promotedKey` into the `parentNode` and links the `newSibling`
-         * right next to the original `childNode`. If the parent node also overflows after insertion,
-         * this method will trigger a recursive split up towards the root.
-         * * @param parentNode Pointer to the parent node. Can be `nullptr` if the child is the current root,
-         * which triggers the creation of a new root node.
+         * @param parentNode Pointer to the parent node.
          * @param childNode  Pointer to the original left child node that just caused the split.
          * @param promotedKey The key that is being pushed up to the parent index level.
          * @param newSibling Pointer to the newly created right sibling node that splits from the child.
@@ -69,9 +65,8 @@ namespace mislib
 
         friend class TreeSerializer;
 
-
-        /** * @param id: Item id
-         * @param offset: Offset of real record in data file
+        /** * @param id: Item id (veya Hash değeri)
+         * @param offset: Offset of real record in data file (veya İkincil Ağaç için Kitap ID'si)
          * @brief Inserts new node in tree
          * @returns Returns bool to show success
          */
@@ -84,19 +79,50 @@ namespace mislib
          */
         bool remove(size_t id);
 
+        /**
+         * @brief Handles underflow conditions when a node falls below the minimum key threshold.
+         */
+        void handleUnderflow(BPlusNode* node);
+
+        /**
+         * @brief Borrows the largest key from the left sibling and updates the parent router.
+         */
+        void borrowFromLeft(BPlusNode* node, BPlusNode* leftSibling, BPlusNode* parent, size_t parentIdx);
+
+        /**
+         * @brief Borrows the smallest key from the right sibling and updates the parent router.
+         */
+        void borrowFromRight(BPlusNode* node, BPlusNode* rightSibling, BPlusNode* parent, size_t parentIdx);
+
+        /**
+         * @brief Merges the right node into the left node and removes the separator key from the parent.
+         */
+        void mergeNodes(BPlusNode* leftNode, BPlusNode* rightNode, BPlusNode* parent, size_t parentIdx);
+
         /** * @param id: Search id for the item.
-         * @brief Searches for a record offset by its ID in the B+ Tree.
+         * @brief Searches for a SINGLE record offset by its ID in the B+ Tree (Primary Index).
          * @return Returns std::nullopt if the tree is empty or the ID doesn't exist.
          */
         std::optional<size_t> search(size_t id);
 
         /**
+         * @brief Searches for ALL records matching a given ID (Secondary Index Multi-Map).
+         * Crucial for Secondary Indexing where one key (e.g., Author Hash) has multiple values (Book IDs).
+         */
+        std::vector<size_t> searchAll(size_t id);
+
+        /**
          * @param filename: Path to the data file
          * @brief Traverses the leaf-level linked list to print all records in ascending order.
-         * This leverages the B+ Tree structure for O(N) sequential scanning.
          */
         void listAllRecords(const std::string& filename);
 
+        /**
+         * @param node current node 
+         * @brief Deletes nodes by recursively traversing from current node to the leaf node
+         */
+        void clear(BPlusNode* node);
+        
     };
 } // namespace mislib
 

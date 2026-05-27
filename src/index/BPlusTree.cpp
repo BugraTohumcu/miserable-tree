@@ -5,7 +5,6 @@
 #include "../util/BPlusTreeUtils.h"
 #include <fstream>
 #include <string>
-#include "../index/IndexEntry.h"
 
 namespace mislib
 {
@@ -14,7 +13,8 @@ namespace mislib
     }
 
     BPlusTree::~BPlusTree() {
-        // --- Destruction logic will be implemented --- 
+        clear(root);
+        root = nullptr;
     }
 
     BPlusNode* BPlusTree::searchPosition(size_t id) {
@@ -27,6 +27,9 @@ namespace mislib
         while (!current->isLeaf) {
             // Binary search to find the correct subtree router
             auto [index, it] = mislib::IdSearch(current->keys, id);
+            
+            // CRITICAL FIX: Multi-Map (çoklu kayıt) sisteminde aynı ID'nin ilk
+            // başlangıç noktasını bulmak için HER ZAMAN SOLA sapmalıyız!
             current = current->children[index];
         }
 
@@ -40,17 +43,12 @@ namespace mislib
         // Traverse down the internal nodes until we hit the leaf level
         while (!current->isLeaf) {
             // Binary search within the node keys to find the branch guide
-            auto it = std::lower_bound(current->keys.begin(), current->keys.end(), id);
-            size_t index = std::distance(current->keys.begin(), it);
-
-            // Edge Case: If the exact ID exists in an internal node, B+ Tree rules
-            // dictate that the actual data points to the right child (index + 1).
-            if (index < current->keys.size() && current->keys[index] == id) {
-                current = current->children[index + 1];
-            }
-            else {
-                current = current->children[index];
-            }
+            auto [index, it] = mislib::IdSearch(current->keys, id);
+            
+            // CRITICAL FIX: Primary Key (Tekil ID) araması yaparken bile,
+            // insert yapısının kurguladığı rotayı (sola sapma) bozmamak için 
+            // aynı searchPosition mantığını takip ediyoruz!
+            current = current->children[index];
         }
 
         // Now at the leaf level, execute the final search for the actual record
@@ -71,10 +69,8 @@ namespace mislib
         // Find index with binary search
         auto [index, it] = mislib::IdSearch(leaf->keys, id);
 
-        // If id is already there do not add
-        if (index < leaf->keys.size() && leaf->keys[index] == id) {
-            return false;
-        }
+        // ENGEL KALDIRILDI: Artık aynı ID'den (örneğin aynı yazar hash'inden) birden fazla eklenebilir!
+        // if (index < leaf->keys.size() && leaf->keys[index] == id) { return false; }
 
         // Insert the key and offset inside the leaf
         leaf->keys.insert(it, id);
@@ -123,18 +119,157 @@ namespace mislib
         leaf->keys.erase(it);
         leaf->offsets.erase(leaf->offsets.begin() + index);
 
-        // Update hierarchy: if the deleted key is used as a router in internal nodes
-        BPlusNode* parentNode = leaf->parent;
-        while (parentNode != nullptr) {
-            for (size_t i = 0; i < parentNode->keys.size(); ++i) {
-                if (parentNode->keys[i] == id) {
-                    parentNode->keys[i] = leaf->keys.empty() ? 0 : leaf->keys[0];
-                }
-            }
-            parentNode = parentNode->parent;
+        // Check if there is underflow
+        size_t minKeys = BPlusTree::order / 2;
+        if (leaf != root && leaf->keys.size() < minKeys) {
+            handleUnderflow(leaf);
         }
+
+        // Shrink tree height if root becomes empty after cascade merges
+        if (root->keys.empty() && !root->isLeaf) {
+            BPlusNode* oldRoot = root;
+            root = root->children[0];
+            root->parent = nullptr;
+            delete oldRoot;
+        }
+
         return true;
     }
+
+    void BPlusTree::handleUnderflow(BPlusNode* node) {
+        BPlusNode* parent = node->parent;
+        if (!parent) return;
+
+        // Find the index of the current node inside parent's children vector
+        auto it = std::find(parent->children.begin(), parent->children.end(), node);
+        size_t idx = std::distance(parent->children.begin(), it);
+
+        // Define siblings without exceeding boundaries
+        BPlusNode* leftSibling = (idx > 0) ? parent->children[idx - 1] : nullptr;
+        BPlusNode* rightSibling = (idx < parent->children.size() - 1) ? parent->children[idx + 1] : nullptr;
+
+        size_t minKeys = BPlusTree::order / 2;
+
+        // Strategy 1: Check left sibling first, borrow if it has enough keys
+        if (leftSibling && leftSibling->keys.size() > minKeys) {
+            borrowFromLeft(node, leftSibling, parent, idx - 1);
+            return;
+        }
+
+        // Strategy 2: Check right sibling, borrow if it has enough keys
+        if (rightSibling && rightSibling->keys.size() > minKeys) {
+            borrowFromRight(node, rightSibling, parent, idx);
+            return;
+        }
+
+        // Strategy 3: Merge if borrowing is not possible from both siblings
+        if (leftSibling) {
+            mergeNodes(leftSibling, node, parent, idx - 1);
+        } else if (rightSibling) {
+            mergeNodes(node, rightSibling, parent, idx);
+        }
+
+        // Cascade underflow check up to the parent node
+        if (parent != root && parent->keys.size() < minKeys) {
+            handleUnderflow(parent);
+        }
+    }
+
+    void BPlusTree::borrowFromLeft(BPlusNode* node, BPlusNode* leftSibling, BPlusNode* parent, size_t parentIdx) {
+        if (node->isLeaf) {
+            // Move the largest key from left sibling to the beginning of current node
+            node->keys.insert(node->keys.begin(), leftSibling->keys.back());
+            node->offsets.insert(node->offsets.begin(), leftSibling->offsets.back());
+
+            // Remove the transferred item from left sibling
+            leftSibling->keys.pop_back();
+            leftSibling->offsets.pop_back();
+
+            // Update the router key in parent to reflect the new minimum key of current node
+            parent->keys[parentIdx] = node->keys[0];
+        } 
+        else {
+            // INTERNAL NODE BORROW (Rotation Mechanism)
+            
+            // 1. Demote the parent's separator key down to the beginning of current node's keys
+            node->keys.insert(node->keys.begin(), parent->keys[parentIdx]);
+
+            // 2. Promote the left sibling's largest key up to the parent's separator position
+            parent->keys[parentIdx] = leftSibling->keys.back();
+            leftSibling->keys.pop_back();
+
+            // 3. Transfer the left sibling's last child to the current node's first child position
+            node->children.insert(node->children.begin(), leftSibling->children.back());
+            leftSibling->children.pop_back();
+
+            // 4. Update the parent pointer of the transferred child node
+            node->children.front()->parent = node;
+        }
+    }
+    
+    void BPlusTree::borrowFromRight(BPlusNode* node, BPlusNode* rightSibling, BPlusNode* parent, size_t parentIdx) {
+        if (node->isLeaf) {
+            // Move the smallest key from right sibling to the end of current node
+            node->keys.push_back(rightSibling->keys.front());
+            node->offsets.push_back(rightSibling->offsets.front());
+
+            // Remove the transferred item from right sibling
+            rightSibling->keys.erase(rightSibling->keys.begin());
+            rightSibling->offsets.erase(rightSibling->offsets.begin());
+
+            // Update the router key in parent to reflect the new minimum key of right sibling
+            parent->keys[parentIdx] = rightSibling->keys[0];
+        } 
+        else {
+            // INTERNAL NODE BORROW (Counter-Clockwise Rotation Mechanism)
+            
+            // 1. Demote the parent's separator key down to the end of current node's keys
+            node->keys.push_back(parent->keys[parentIdx]);
+
+            // 2. Promote the right sibling's smallest key up to the parent's separator position
+            parent->keys[parentIdx] = rightSibling->keys.front();
+            rightSibling->keys.erase(rightSibling->keys.begin());
+
+            // 3. Transfer the right sibling's first child to the current node's last child position
+            node->children.push_back(rightSibling->children.front());
+            rightSibling->children.erase(rightSibling->children.begin());
+
+            // 4. Update the parent pointer of the transferred child node
+            node->children.back()->parent = node;
+        }
+    }
+
+    void BPlusTree::mergeNodes(BPlusNode* leftNode, BPlusNode* rightNode, BPlusNode* parent, size_t parentIdx) {
+        if (leftNode->isLeaf) {
+            // your existing leaf merge code stays exactly the same
+            leftNode->keys.insert(leftNode->keys.end(), rightNode->keys.begin(), rightNode->keys.end());
+            leftNode->offsets.insert(leftNode->offsets.end(), rightNode->offsets.begin(), rightNode->offsets.end());
+            leftNode->next = rightNode->next;
+
+            parent->keys.erase(parent->keys.begin() + parentIdx);
+            parent->children.erase(parent->children.begin() + parentIdx + 1);
+            delete rightNode;
+
+        } else {
+            // Pull the separator key down from parent into left node
+            leftNode->keys.push_back(parent->keys[parentIdx]);
+
+            // Move all keys and children from right node into left node
+            leftNode->keys.insert(leftNode->keys.end(), rightNode->keys.begin(), rightNode->keys.end());
+            leftNode->children.insert(leftNode->children.end(), rightNode->children.begin(), rightNode->children.end());
+
+            // Re-map children to their new parent
+            for (auto* child : rightNode->children) {
+                if (child) child->parent = leftNode;
+            }
+
+            // Remove separator key and right child pointer from parent
+            parent->keys.erase(parent->keys.begin() + parentIdx);
+            parent->children.erase(parent->children.begin() + parentIdx + 1);
+            delete rightNode;
+        }
+    }
+
     void BPlusTree::listAllRecords(const std::string& filename) {
         if (root == nullptr) return;
 
@@ -147,8 +282,6 @@ namespace mislib
         // Step 2: Read the physical data file
         std::ifstream file(filename);
         if (!file.is_open()) return;
-
-        std::cout << "\n--- ALL RECORDS ARE BEING LISTED  ---" << std::endl;
 
         // Step 3: Linearly trace the linked list between the leaves
         while (current != nullptr) {
@@ -213,6 +346,43 @@ namespace mislib
         }
     }
 
+    void BPlusTree::clear(BPlusNode* node){
+        if(node == nullptr) return;
 
+        // If it is not a leaf node traverse recurively and delete leaf node first
+        if(!node->isLeaf){
+            for(const auto& child: node->children){
+                clear(child);
+            }
+        }
+
+        //Delete node if it is a leaf node        
+        delete node;
+    }
+
+    // --- MULTI-MAP SECONDARY SEARCH ---
+    std::vector<size_t> BPlusTree::searchAll(size_t id) {
+        std::vector<size_t> results;
+        if (root == nullptr) return results;
+
+        // En soldaki potansiyel yaprağı bul
+        BPlusNode* current = searchPosition(id);
+        if (!current) return results;
+
+        // B+ Tree yapraklari (leaf) uzerinde ileriye dogru baglantili liste taramasi
+        while (current != nullptr) {
+            for (size_t i = 0; i < current->keys.size(); ++i) {
+                if (current->keys[i] == id) {
+                    results.push_back(current->offsets[i]);
+                } else if (current->keys[i] > id) {
+                    // Hedefi gectik, aramayi bitir (O(logN) hizinda)
+                    return results; 
+                }
+            }
+            // Eger kayitlar yan yapraga tastiysa oradan devam et
+            current = current->next; 
+        }
+        return results;
+    }
 
 } // namespace mislib
