@@ -21,12 +21,10 @@ namespace mislib{
     namespace detail{
         static void copyField(char* dest, const char* src, int start, int end, size_t destSize){
     
-            // Baştaki boşlukları atla (Zaten vardı)
             while (start < end && src[start] == ' ') {
                 start++;
             }
     
-            // YENI EKLENEN KISIM: Sondaki boşlukları atla (Trailing space temizliği)
             while (end > start && src[end - 1] == ' ') {
                 end--;
             }
