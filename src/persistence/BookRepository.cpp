@@ -1,5 +1,7 @@
 #include "BookRepository.h"
 #include "../util/BookParser.h"
+#include "../util/BPlusTreeUtils.h" 
+#include "../index/TreeSerializer.h" 
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
@@ -24,16 +26,45 @@ namespace mislib
         if (!readFile.is_open() || !writeFile.is_open())
             throw std::runtime_error("[REPO] Cannot open data file: " + dataPath);
 
+        // Try loading secondary tree indexes directly from disk binaries
+        bool authorsLoaded = mislib::TreeSerializer::loadTree(authorTree, "AuthorIndex.dat");
+        bool genresLoaded = mislib::TreeSerializer::loadTree(genreTree, "GenreIndex.dat");
+
+        // --- CRITICAL FIX: HAYALET DOSYA KONTROLÜ EKLENDİ ---
+        // Eğer dosya okunmuş ama ağaç tamamen boşsa, sahte yüklemeyi iptal et ve baştan inşa et!
+        if (authorsLoaded && authorTree.getRoot() != nullptr && authorTree.getRoot()->keys.empty() && authorTree.getRoot()->isLeaf) {
+            authorsLoaded = false;
+        }
+        if (genresLoaded && genreTree.getRoot() != nullptr && genreTree.getRoot()->keys.empty() && genreTree.getRoot()->isLeaf) {
+            genresLoaded = false;
+        }
+        // ----------------------------------------------------
+
         // Inject book-specific parsing logic into the index build process.
-        // IndexManager has no knowledge of Book — it only sees raw lines and offsets.
-        // Soft-deleted records (prefixed with '!') are excluded from the index.
-        indexManager.loadOrBuild(dataPath, [this](const std::string& line, size_t offset) {
+        // Now it parses the full book to populate secondary tree indices.
+        indexManager.loadOrBuild(dataPath, [this, authorsLoaded, genresLoaded](const std::string& line, size_t offset) {
             if (line.empty() || line.front() == DELETED_MARKER) return;
 
             size_t id = mislib::extractId(line.c_str());
             indexManager.getTree().insert(id, offset);
+
             if (id > lastId) lastId = id;
-            });
+        });
+
+        // Fail-safe recovery: If binary files are missing or empty, scan the dataset to regenerate them
+        if (!authorsLoaded || !genresLoaded) {
+            std::ifstream buildFile(dataPath);
+            std::string line;
+            while (buildFile.good()) {
+                if (!std::getline(buildFile, line)) break;
+                if (line.empty() || line.front() == DELETED_MARKER) continue;
+                
+                Book book = mislib::parseToBook(line.c_str());
+                if (!authorsLoaded) authorTree.insert(mislib::HashString(book.author), book.id);
+                if (!genresLoaded) genreTree.insert(mislib::HashString(book.genre), book.id);
+            }
+            buildFile.close();
+        }
 
         // If the index was loaded from a serialized file, lastId remains 0.
         // We traverse to the rightmost leaf of the B+ Tree to recover the maximum active ID.
@@ -57,6 +88,10 @@ namespace mislib
 
     BookRepo::~BookRepo() {
         indexManager.save();
+        // Serialize pure secondary tree structures to disk
+        mislib::TreeSerializer::saveTree(authorTree, "AuthorIndex.dat");
+        mislib::TreeSerializer::saveTree(genreTree, "GenreIndex.dat");
+        
         if (readFile.is_open()) readFile.close();
         if (writeFile.is_open()) writeFile.close();
     }
@@ -81,6 +116,10 @@ namespace mislib
 
         // CRITICAL FIX: Commit index structural state to Index.dat immediately
         indexManager.save();
+
+        // Insert into secondary indices by hashing strings and map to book primary key ID
+        authorTree.insert(mislib::HashString(book.author), book.id);
+        genreTree.insert(mislib::HashString(book.genre), book.id);
 
         return result;
     }
@@ -139,6 +178,10 @@ namespace mislib
         // CRITICAL FIX: Save structural index changes immediately
         indexManager.save();
 
+        // Add the new text mapping in case author/genre data strings were updated
+        authorTree.insert(mislib::HashString(data.author), data.id);
+        genreTree.insert(mislib::HashString(data.genre), data.id);
+
         return result;
     }
 
@@ -167,4 +210,30 @@ namespace mislib
         indexManager.getTree().listAllRecords(dataPath);
     }
 
+    // --- SECONDARY INDEX OPERATIONS ---
+
+    std::vector<Book> BookRepo::getByAuthor(const std::string& author) {
+        std::vector<Book> results;
+        std::vector<size_t> ids = authorTree.searchAll(mislib::HashString(author));
+        for (size_t id : ids) {
+            Book b;
+            // get() ignores soft-deleted records implicitly
+            if (get(id, b) && std::string(b.author) == author) {
+                results.push_back(b);
+            }
+        }
+        return results;
+    }
+
+    std::vector<Book> BookRepo::getByGenre(const std::string& genre) {
+        std::vector<Book> results;
+        std::vector<size_t> ids = genreTree.searchAll(mislib::HashString(genre));
+        for (size_t id : ids) {
+            Book b;
+            if (get(id, b) && std::string(b.genre) == genre) {
+                results.push_back(b);
+            }
+        }
+        return results;
+    }
 } // namespace mislib

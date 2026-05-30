@@ -15,6 +15,8 @@ namespace mislib
     BPlusTree::~BPlusTree() {
         clear(root);
         root = nullptr;
+        clear(root);
+        root = nullptr;
     }
 
     BPlusNode* BPlusTree::searchPosition(size_t id) {
@@ -27,6 +29,9 @@ namespace mislib
         while (!current->isLeaf) {
             // Binary search to find the correct subtree router
             auto [index, it] = mislib::IdSearch(current->keys, id);
+            
+            // CRITICAL FIX: Multi-Map (çoklu kayıt) sisteminde aynı ID'nin ilk
+            // başlangıç noktasını bulmak için HER ZAMAN SOLA sapmalıyız!
             current = current->children[index];
         }
 
@@ -40,17 +45,12 @@ namespace mislib
         // Traverse down the internal nodes until we hit the leaf level
         while (!current->isLeaf) {
             // Binary search within the node keys to find the branch guide
-            auto it = std::lower_bound(current->keys.begin(), current->keys.end(), id);
-            size_t index = std::distance(current->keys.begin(), it);
-
-            // Edge Case: If the exact ID exists in an internal node, B+ Tree rules
-            // dictate that the actual data points to the right child (index + 1).
-            if (index < current->keys.size() && current->keys[index] == id) {
-                current = current->children[index + 1];
-            }
-            else {
-                current = current->children[index];
-            }
+            auto [index, it] = mislib::IdSearch(current->keys, id);
+            
+            // CRITICAL FIX: Primary Key (Tekil ID) araması yaparken bile,
+            // insert yapısının kurguladığı rotayı (sola sapma) bozmamak için 
+            // aynı searchPosition mantığını takip ediyoruz!
+            current = current->children[index];
         }
 
         // Now at the leaf level, execute the final search for the actual record
@@ -71,10 +71,8 @@ namespace mislib
         // Find index with binary search
         auto [index, it] = mislib::IdSearch(leaf->keys, id);
 
-        // If id is already there do not add
-        if (index < leaf->keys.size() && leaf->keys[index] == id) {
-            return false;
-        }
+        // ENGEL KALDIRILDI: Artık aynı ID'den (örneğin aynı yazar hash'inden) birden fazla eklenebilir!
+        // if (index < leaf->keys.size() && leaf->keys[index] == id) { return false; }
 
         // Insert the key and offset inside the leaf
         leaf->keys.insert(it, id);
@@ -135,10 +133,24 @@ namespace mislib
             root = root->children[0];
             root->parent = nullptr;
             delete oldRoot;
+        // Check if there is underflow
+        size_t minKeys = BPlusTree::order / 2;
+        if (leaf != root && leaf->keys.size() < minKeys) {
+            handleUnderflow(leaf);
         }
+
+        // Shrink tree height if root becomes empty after cascade merges
+        if (root->keys.empty() && !root->isLeaf) {
+            BPlusNode* oldRoot = root;
+            root = root->children[0];
+            root->parent = nullptr;
+            delete oldRoot;
+        }
+
 
         return true;
     }
+}
 
     void BPlusTree::handleUnderflow(BPlusNode* node) {
         BPlusNode* parent = node->parent;
@@ -361,6 +373,31 @@ namespace mislib
 
         //Delete node if it is a leaf node        
         delete node;
+    }
+
+    // --- MULTI-MAP SECONDARY SEARCH ---
+    std::vector<size_t> BPlusTree::searchAll(size_t id) {
+        std::vector<size_t> results;
+        if (root == nullptr) return results;
+
+        // En soldaki potansiyel yaprağı bul
+        BPlusNode* current = searchPosition(id);
+        if (!current) return results;
+
+        // B+ Tree yapraklari (leaf) uzerinde ileriye dogru baglantili liste taramasi
+        while (current != nullptr) {
+            for (size_t i = 0; i < current->keys.size(); ++i) {
+                if (current->keys[i] == id) {
+                    results.push_back(current->offsets[i]);
+                } else if (current->keys[i] > id) {
+                    // Hedefi gectik, aramayi bitir (O(logN) hizinda)
+                    return results; 
+                }
+            }
+            // Eger kayitlar yan yapraga tastiysa oradan devam et
+            current = current->next; 
+        }
+        return results;
     }
 
 } // namespace mislib
