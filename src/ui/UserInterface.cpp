@@ -1,33 +1,26 @@
-        #include "UserInterface.h"
+#include "UserInterface.h"
 #include <iostream>
 #include <chrono>
 #include <string>
 #include <limits>
-#include <cstring> 
 
 using namespace std;
 
 namespace mislib
 {
     UserInterface::UserInterface(const std::string& dataPath)
-        : repo(dataPath) {
-    }
+        : repo(dataPath) {}
 
     void UserInterface::printMenu() const {
-        cout << "\n==================================================\n"
-            << "         MISLIB DISK-BASED DBMS DASHBOARD         \n"
-            << "==================================================\n"
-            << " [Active Last ID: " << repo.getLastId() << "]\n\n"
-            << "  1. Search Book by ID\n"
-            << "  2. Register New Book (Auto-ID)\n"
-            << "  3. Update Existing Book\n"
-            << "  4. Delete Book Record (Soft-Delete)\n"
-            << "  5. List All Active Records (Sorted)\n"
-            << "  6. Search Books by Author\n"
-            << "  7. Search Books by Genre\n"
-            << "  0. Shutdown System\n"
-            << "--------------------------------------------------\n"
-            << "Selection: ";
+        cout << "\n--- MISLIB SYSTEM DASHBOARD (Last ID: " << repo.getLastId() << ") ---\n"
+             << "1. Search Book by ID\n"
+             << "2. Register New Book (Auto-ID)\n"
+             << "3. Delete Book Record\n"
+             << "4. List All Records (Sorted)\n"
+             << "5. Search Books by Author\n"
+             << "6. Search Books by Genre\n"
+             << "0. Shutdown System\n"
+             << "Selection: ";
     }
 
     void UserInterface::handleSearch() {
@@ -35,152 +28,102 @@ namespace mislib
         cout << "Enter Search ID: "; cin >> id;
 
         auto start = chrono::high_resolution_clock::now();
+
         Book book;
         bool found = repo.get(id, book);
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
+
+        auto elapsed = chrono::duration_cast<chrono::microseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
 
         if (found) {
-            cout << "\n[RESULT] Record Located Successfully (Latency: " << elapsed << " us):\n"
-                << "--------------------------------------------------\n" << book;
-        }
-        else {
-            cout << "\n[ERROR] Book with ID " << id << " not found or deleted. (Latency: " << elapsed << " us)\n";
+            cout << "\n[RESULT] Record Located Successfully:\n"
+                 << book
+                 << "Access Latency: " << elapsed << " us\n";
+        } else {
+            cout << "\n[ERROR] ID " << id << " not found in the index.\n";
         }
     }
 
     void UserInterface::handleInsert() {
         Book book;
-        book.id = 0; 
-
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
-       
-        cout << "Enter Title: ";  cin.getline(book.title, sizeof(book.title));
-        cout << "Enter Author: "; cin.getline(book.author, sizeof(book.author));
-        cout << "Enter Genre: ";  cin.getline(book.genre, sizeof(book.genre));
-        cout << "Enter Year: ";   cin >> book.date;
+        cout << "Title: ";  cin.getline(book.title,  50);
+        cout << "Author: "; cin.getline(book.author, 50);
+        cout << "Genre: ";  cin.getline(book.genre,  30);
+        cout << "Year: ";   cin >> book.date;
 
-        auto start = chrono::high_resolution_clock::now();
-        bool success = repo.create(book);
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
-
-        if (success) {
-            cout << "\n[SUCCESS] Book registered successfully! (Latency: " << elapsed << " us)\n";
-        }
-        else {
-            cout << "\n[ERROR] Failed to write record to disk.\n";
-        }
-    }
-
-    void UserInterface::handleUpdate() {
-        size_t id;
-        cout << "Enter Book ID to Update: "; cin >> id;
-
-        Book oldBook;
-        if (!repo.get(id, oldBook)) {
-            cout << "\n[ERROR] Cannot update. Book ID " << id << " does not exist.\n";
-            return;
-        }
-
-        cout << "\n[INFO] Current Data: " << oldBook.title << " by " << oldBook.author << "\n";
-
-        Book newBook;
-        newBook.id = id; 
-
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "Enter New Title (Leave empty to keep current): ";
-        cin.getline(newBook.title, sizeof(newBook.title));
-        if (strlen(newBook.title) == 0) strcpy(newBook.title, oldBook.title);
-
-        cout << "Enter New Author (Leave empty to keep current): ";
-        cin.getline(newBook.author, sizeof(newBook.author));
-        if (strlen(newBook.author) == 0) strcpy(newBook.author, oldBook.author);
-
-        cout << "Enter New Genre (Leave empty to keep current): ";
-        cin.getline(newBook.genre, sizeof(newBook.genre));
-        if (strlen(newBook.genre) == 0) strcpy(newBook.genre, oldBook.genre);
-
-        cout << "Enter New Year (0 to keep current): ";
-        cin >> newBook.date;
-        if (newBook.date == 0) newBook.date = oldBook.date;
-
-        auto start = chrono::high_resolution_clock::now();
-        bool success = repo.update(newBook);
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
-
-        if (success) {
-            cout << "\n[SUCCESS] Book ID " << id << " updated on disk! (Latency: " << elapsed << " us)\n";
-        }
-        else {
-            cout << "\n[ERROR] Failed to update record.\n";
-        }
+        if (repo.create(book))
+            cout << "\n[SUCCESS] Book registered with ID: " << repo.getLastId() << "\n";
+        else
+            cout << "\n[ERROR] Registration failed.\n";
     }
 
     void UserInterface::handleDelete() {
         size_t id;
-        cout << "Enter Book ID to Delete: "; cin >> id;
+        cout << "Enter ID to Delete: "; cin >> id;
 
-        auto start = chrono::high_resolution_clock::now();
-        bool success = repo.remove(id);
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
-
-        if (success) {
-            cout << "\n[SUCCESS] Record soft-deleted (marked with '" << '!' << "'). (Latency: " << elapsed << " us)\n";
-        }
-        else {
-            cout << "\n[ERROR] Record not found or already deleted.\n";
-        }
+        if (repo.remove(id))
+            cout << "\n[SUCCESS] ID " << id << " removed from index.\n";
+        else
+            cout << "\n[ERROR] Target ID does not exist.\n";
     }
 
     void UserInterface::handleListAll() {
-        cout << "\n--- ALL ACTIVE RECORDS (B+ TREE IN-ORDER TRAVERSAL) ---\n";
         auto start = chrono::high_resolution_clock::now();
+
         repo.listAll();
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
-        cout << "--------------------------------------------------\n"
-            << "Total Traversal Latency: " << elapsed << " us\n";
+
+        auto elapsed = chrono::duration_cast<chrono::milliseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
+
+        cout << "\n[COMPLETE] Full scan latency: " << elapsed << " ms\n";
     }
 
     void UserInterface::handleSearchByAuthor() {
-        string author;
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "Enter Author Name: "; getline(cin, author);
+        char author[80];
+        cout << "Enter Author Name (Exact match): ";
+        cin.getline(author, 80);
 
         auto start = chrono::high_resolution_clock::now();
         std::vector<Book> results = repo.getByAuthor(author);
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
+        auto elapsed = chrono::duration_cast<chrono::microseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
 
         if (!results.empty()) {
-            cout << "\n[RESULT] Found " << results.size() << " books (Secondary Index Latency: " << elapsed << " us):\n";
+            cout << "\n[RESULT] Found " << results.size() << " books by '" << author << "':\n";
             for (const auto& b : results) {
-                cout << "  - ID: " << b.id << " | Title: " << b.title << " | Year: " << b.date << "\n";
+                cout << "- ID: " << b.id << " | Title: " << b.title << " | Genre: " << b.genre << " | Year: " << b.date << "\n";
             }
-        }
-        else {
+            cout << "\nAccess Latency: " << elapsed << " us\n";
+        } else {
             cout << "\n[ERROR] No books found for author: " << author << "\n";
         }
     }
 
     void UserInterface::handleSearchByGenre() {
-        string genre;
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "Enter Genre: "; getline(cin, genre);
+        char genre[40];
+        cout << "Enter Genre Name (Exact match): ";
+        cin.getline(genre, 40);
 
         auto start = chrono::high_resolution_clock::now();
         std::vector<Book> results = repo.getByGenre(genre);
-        auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - start).count();
+        auto elapsed = chrono::duration_cast<chrono::microseconds>
+                       (chrono::high_resolution_clock::now() - start).count();
 
         if (!results.empty()) {
-            cout << "\n[RESULT] Found " << results.size() << " books (Secondary Index Latency: " << elapsed << " us):\n";
+            cout << "\n[RESULT] Found " << results.size() << " books in genre '" << genre << "':\n";
             for (const auto& b : results) {
-                cout << "  - ID: " << b.id << " | Title: " << b.title << " | Author: " << b.author << " | Year: " << b.date << "\n";
+                cout << "- ID: " << b.id << " | Title: " << b.title << " | Author: " << b.author << " | Year: " << b.date << "\n";
             }
-        }
-        else {
+            cout << "\nAccess Latency: " << elapsed << " us\n";
+        } else {
             cout << "\n[ERROR] No books found in genre: " << genre << "\n";
         }
     }
-
+    
     void UserInterface::run() {
         int selection = -1;
         while (selection != 0) {
@@ -189,21 +132,20 @@ namespace mislib
             if (!(cin >> selection)) {
                 cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                cout << "\n[ERROR] Invalid selection. Please enter a number.\n";
                 continue;
             }
 
             switch (selection) {
-            case 1: handleSearch();         break;
-            case 2: handleInsert();         break;
-            case 3: handleUpdate();         break;
-            case 4: handleDelete();         break;
-            case 5: handleListAll();        break;
-            case 6: handleSearchByAuthor(); break;
-            case 7: handleSearchByGenre();  break;
-            case 0: cout << "\n[SYSTEM] Safely flushing indices to disk. Shutting down DBMS...\n"; break;
-            default: cout << "\n[ERROR] Unknown option. Try again.\n"; break;
+                case 1: handleSearch();  break;
+                case 2: handleInsert();  break;
+                case 3: handleDelete();  break;
+                case 4: handleListAll(); break;
+                case 5: handleSearchByAuthor(); break;
+                case 6: handleSearchByGenre(); break;
+                case 0: cout << "\n[BOOT] System shutting down.\n"; break;
+                default: cout << "\n[WARN] Invalid selection.\n"; break;
             }
         }
     }
+
 } // namespace mislib
