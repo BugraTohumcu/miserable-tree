@@ -42,8 +42,11 @@ TEST(test_insert_and_search) {
 TEST(test_duplicate_insert) {
     mislib::BPlusTree tree;
     ASSERT_TRUE(tree.insert(5, 50));
-    ASSERT_FALSE(tree.insert(5, 99));   // duplicate — should be rejected
-    ASSERT_EQ(tree.search(5).value(), 50);
+    ASSERT_TRUE(tree.insert(5, 99));   // SUCCESS: Multi-map allows duplicates now
+    
+    // Use searchAll to verify both values exist for key 5
+    auto results = tree.searchAll(5);
+    ASSERT_EQ(results.size(), 2);
 }
 
 TEST(test_search_missing_key) {
@@ -108,7 +111,9 @@ TEST(test_stress_insert_search) {
         tree.insert(i, i * 10);
     }
     for (size_t i = 1; i <= N; i++) {
-        ASSERT_EQ(tree.search(i).value(), i * 10);
+        auto results = tree.searchAll(i);
+        ASSERT_FALSE(results.empty());       // Ensure we found the key
+        ASSERT_EQ(results.front(), i * 10);  // Verify the offset
     }
 }
 
@@ -129,7 +134,12 @@ TEST(test_stress_random_order) {
 
     // Insert in reverse to stress the split logic
     for (size_t i = N; i >= 1; i--) tree.insert(i, i * 10);
-    for (size_t i = 1; i <= N; i++) ASSERT_EQ(tree.search(i).value(), i * 10);
+    
+    for (size_t i = 1; i <= N; i++) {
+        auto results = tree.searchAll(i);
+        ASSERT_FALSE(results.empty());
+        ASSERT_EQ(results.front(), i * 10);
+    }
 }
 
 TEST(test_stress_remove_find_breaking_point) {
