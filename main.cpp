@@ -4,7 +4,7 @@
 int main() {
     // Instantiate orchestrator and spin up UI processing loop
 
-    const std::string datafilePath = "books_dataset.txt";
+    const std::string datafilePath = "data/books_dataset.txt";
     mislib::UserInterface ui(datafilePath);
     ui.run();
 
