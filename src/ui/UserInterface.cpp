@@ -92,10 +92,10 @@ namespace mislib
                        (chrono::high_resolution_clock::now() - start).count();
 
         if (!results.empty()) {
-            cout << "\n[RESULT] Found " << results.size() << " books by '" << author << "':\n";
             for (const auto& b : results) {
                 cout << "- ID: " << b.id << " | Title: " << b.title << " | Genre: " << b.genre << " | Year: " << b.date << "\n";
             }
+            cout << "\n[RESULT] Found " << results.size() << " books by '" << author << "':\n";
             cout << "\nAccess Latency: " << elapsed << " us\n";
         } else {
             cout << "\n[ERROR] No books found for author: " << author << "\n";
@@ -114,10 +114,10 @@ namespace mislib
                        (chrono::high_resolution_clock::now() - start).count();
 
         if (!results.empty()) {
-            cout << "\n[RESULT] Found " << results.size() << " books in genre '" << genre << "':\n";
             for (const auto& b : results) {
                 cout << "- ID: " << b.id << " | Title: " << b.title << " | Author: " << b.author << " | Year: " << b.date << "\n";
             }
+            cout << "\n[RESULT] Found " << results.size() << " books in genre '" << genre << "':\n";
             cout << "\nAccess Latency: " << elapsed << " us\n";
         } else {
             cout << "\n[ERROR] No books found in genre: " << genre << "\n";
