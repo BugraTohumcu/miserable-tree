@@ -30,8 +30,6 @@ namespace mislib
         bool authorsLoaded = mislib::TreeSerializer::loadTree(authorTree, "AuthorIndex.dat");
         bool genresLoaded = mislib::TreeSerializer::loadTree(genreTree, "GenreIndex.dat");
 
-        // --- CRITICAL FIX: HAYALET DOSYA KONTROLÜ EKLENDİ ---
-        // Eğer dosya okunmuş ama ağaç tamamen boşsa, sahte yüklemeyi iptal et ve baştan inşa et!
         if (authorsLoaded && authorTree.getRoot() != nullptr && authorTree.getRoot()->keys.empty() && authorTree.getRoot()->isLeaf) {
             authorsLoaded = false;
         }
@@ -114,7 +112,6 @@ namespace mislib
 
         bool result = indexManager.getTree().insert(book.id, offset);
 
-        // CRITICAL FIX: Commit index structural state to Index.dat immediately
         indexManager.save();
 
         // Insert into secondary indices by hashing strings and map to book primary key ID
@@ -175,7 +172,6 @@ namespace mislib
         indexManager.getTree().remove(data.id);
         bool result = indexManager.getTree().insert(data.id, newOffset);
 
-        // CRITICAL FIX: Save structural index changes immediately
         indexManager.save();
 
         // Add the new text mapping in case author/genre data strings were updated
@@ -200,7 +196,6 @@ namespace mislib
 
         bool result = indexManager.getTree().remove(id);
 
-        // CRITICAL FIX: Synchronize changes to transactional disk index
         indexManager.save();
 
         return result;
