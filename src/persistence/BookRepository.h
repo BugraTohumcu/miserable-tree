@@ -8,7 +8,7 @@
 #include "CrudRepository.h"
 #include "../entity/BookEntity.h"
 #include "../index/IndexManager.h"
-#include "../index/BPlusTree.h" // YENI EKLENDI: Safkan Secondary Index icin
+#include "../index/BPlusTree.h" 
 
 namespace mislib
 {
@@ -96,7 +96,7 @@ namespace mislib
         IndexManager  indexManager; // Primary Index
         size_t        lastId = 0;
 
-        // --- SECONDARY INDICES (Safkan B+ Tree Yapilari) ---
+        // --- SECONDARY INDICES ---
         mislib::BPlusTree authorTree;
         mislib::BPlusTree genreTree;
 
