@@ -30,8 +30,6 @@ namespace mislib
             // Binary search to find the correct subtree router
             auto [index, it] = mislib::IdSearch(current->keys, id);
             
-            // CRITICAL FIX: Multi-Map (çoklu kayıt) sisteminde aynı ID'nin ilk
-            // başlangıç noktasını bulmak için HER ZAMAN SOLA sapmalıyız!
             current = current->children[index];
         }
 
@@ -47,9 +45,6 @@ namespace mislib
             // Binary search within the node keys to find the branch guide
             auto [index, it] = mislib::IdSearch(current->keys, id);
             
-            // CRITICAL FIX: Primary Key (Tekil ID) araması yaparken bile,
-            // insert yapısının kurguladığı rotayı (sola sapma) bozmamak için 
-            // aynı searchPosition mantığını takip ediyoruz!
             current = current->children[index];
         }
 
@@ -133,24 +128,10 @@ namespace mislib
             root = root->children[0];
             root->parent = nullptr;
             delete oldRoot;
-        // Check if there is underflow
-        size_t minKeys = BPlusTree::order / 2;
-        if (leaf != root && leaf->keys.size() < minKeys) {
-            handleUnderflow(leaf);
         }
-
-        // Shrink tree height if root becomes empty after cascade merges
-        if (root->keys.empty() && !root->isLeaf) {
-            BPlusNode* oldRoot = root;
-            root = root->children[0];
-            root->parent = nullptr;
-            delete oldRoot;
-        }
-
 
         return true;
     }
-}
 
     void BPlusTree::handleUnderflow(BPlusNode* node) {
         BPlusNode* parent = node->parent;
@@ -380,21 +361,18 @@ namespace mislib
         std::vector<size_t> results;
         if (root == nullptr) return results;
 
-        // En soldaki potansiyel yaprağı bul
         BPlusNode* current = searchPosition(id);
         if (!current) return results;
 
-        // B+ Tree yapraklari (leaf) uzerinde ileriye dogru baglantili liste taramasi
         while (current != nullptr) {
             for (size_t i = 0; i < current->keys.size(); ++i) {
                 if (current->keys[i] == id) {
                     results.push_back(current->offsets[i]);
                 } else if (current->keys[i] > id) {
-                    // Hedefi gectik, aramayi bitir (O(logN) hizinda)
+
                     return results; 
                 }
             }
-            // Eger kayitlar yan yapraga tastiysa oradan devam et
             current = current->next; 
         }
         return results;
