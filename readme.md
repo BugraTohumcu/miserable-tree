@@ -137,7 +137,7 @@ Output example:
   Net memory : 53.4883 MB
   Avg lookup : 0.41 µs
   Hit rate   : 1000 / 1000
-
+```
 ---
 
 ## Data File Format
