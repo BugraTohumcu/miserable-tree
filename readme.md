@@ -132,7 +132,7 @@ Output example:
      MISLIB INDEX ACCESS BENCHMARK 
 ====================================================
 
-[RUNNING] 10K — data/books_dataset.txt
+[RUNNING] 1M — data/books_dataset.txt
   Build time : 121 ms
   Net memory : 53.4883 MB
   Avg lookup : 0.41 µs
