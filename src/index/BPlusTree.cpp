@@ -15,8 +15,6 @@ namespace mislib
     BPlusTree::~BPlusTree() {
         clear(root);
         root = nullptr;
-        clear(root);
-        root = nullptr;
     }
 
     BPlusNode* BPlusTree::searchPosition(size_t id) {
