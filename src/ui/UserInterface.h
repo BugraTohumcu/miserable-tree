@@ -22,17 +22,17 @@ namespace mislib
 
     private:
         mislib::BookRepo repo;
-        
 
         void handleSearch();
         void handleInsert();
+        void handleUpdate(); 
         void handleDelete();
         void handleListAll();
-        void printMenu() const;
         void handleSearchByAuthor();
         void handleSearchByGenre();
+        void printMenu() const;
     };
 
 } // namespace mislib
 
-#endif
+#endif // USER_INTERFACE
