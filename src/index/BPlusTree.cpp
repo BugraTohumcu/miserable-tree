@@ -64,9 +64,6 @@ namespace mislib
         // Find index with binary search
         auto [index, it] = mislib::IdSearch(leaf->keys, id);
 
-        // ENGEL KALDIRILDI: Artık aynı ID'den (örneğin aynı yazar hash'inden) birden fazla eklenebilir!
-        // if (index < leaf->keys.size() && leaf->keys[index] == id) { return false; }
-
         // Insert the key and offset inside the leaf
         leaf->keys.insert(it, id);
         leaf->offsets.insert(leaf->offsets.begin() + index, offset);
