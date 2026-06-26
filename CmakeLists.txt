@@ -27,7 +27,7 @@ target_include_directories(run_tests PRIVATE src)
 add_executable(scale_benchmark "benchmark/benchmark.cpp" ${SRC_FILES})
 target_include_directories(scale_benchmark PRIVATE src)
 
-# CRITICAL WIN32 FIX: Link Windows Process Status API (psapi) for RAM profiling
+# Link Windows Process Status API (psapi) for RAM profiling
 if(WIN32)
     target_link_libraries(scale_benchmark PRIVATE psapi)
 endif()
