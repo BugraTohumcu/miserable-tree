@@ -145,7 +145,7 @@ Output example:
   Build time : 2196 ms
   Net memory : 70.3789 MB
 
-Avg lookup (independent of size) : 0.41 µs
+Avg lookup (independent of size) : 41 µs
   
 ```
 ---
