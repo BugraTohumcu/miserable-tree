@@ -69,7 +69,7 @@ namespace mislib
         if (lastId == 0) {
             mislib::BPlusTree& tree = indexManager.getTree();
 
-            if (tree.getRoot() != nullptr) { // tree.root yerine tree.getRoot() yapıldı
+            if (tree.getRoot() != nullptr) {
                 BPlusNode* current = tree.getRoot();
 
                 // Drill down to the rightmost leaf node to recover index state
